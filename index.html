@@ -1,0 +1,236 @@
+charset=utf-8<script>document.write(unescape('<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xnxx - Portfolio</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Google Fonts: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Global Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+            scroll-behavior: smooth;
+        }
+        body {
+            background-color: #0a0a0a;
+            color: #fff;
+            text-align: center;
+            overflow-x: hidden;
+        }
+
+        /* Particle Background */
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: #0a0a0a;
+            z-index: -1;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+            background: rgba(0, 0, 0, 0.9);
+            box-shadow: 0 3px 10px rgba(0, 255, 0, 0.3);
+            z-index: 100;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+            background: rgba(0, 0, 0, 0.9);
+            box-shadow: 0 3px 10px rgba(0, 255, 0, 0.3);
+            z-index: 100;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+        .logo span {
+            color: #00ff00;
+        }
+
+        /* Hero Section */
+        .hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 90vh;
+            padding: 20px;
+            margin-top: 50px;
+        }
+        .hero .profile-container {
+            position: relative;
+            width: 170px;
+            height: 170px;
+            animation: float 3s infinite ease-in-out;
+        }
+        .hero .profile {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: url('https://files.catbox.moe/b5qehj.jpg') center/cover;
+            border: 4px solid #00ff00;
+            box-shadow: 0 0 15px #00ff00;
+        }
+
+        /* Floating Animation */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Text Styling */
+        .hero .small-text {
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: #bbb;
+        }
+        .hero h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+        .hero .typing {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #00ff00;
+            white-space: nowrap;
+            overflow: hidden;
+            border-right: 3px solid #00ff00;
+            display: inline-block;
+        }
+        .hero .sub-text {
+            font-size: 1rem;
+            margin-top: 8px;
+            color: #bbb;
+            font-weight: 400;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            justify-content: center;
+            position: fixed;
+            bottom: 0;
+width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px 0;
+            box-shadow: 0 -3px 10px rgba(0, 255, 0, 0.3);
+        }
+        .navbar a {
+            text-decoration: none;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 0 15px;
+            transition: 0.3s;
+            position: relative;
+        }
+        .navbar a:hover,
+        .navbar a.active {
+            color: #00ff00;
+        }
+        .navbar a.active::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: -5px;
+            width: 10px;
+            height: 3px;
+            background: #00ff00;
+            transform: translateX(-50%);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Particles -->
+    <div id="particles-js"></div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">Xnxx<span>.com
+        </span>();</div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="profile-container">
+            <div class="profile"></div>
+        </div>
+        <p class="small-text">Hello World, I'm</p>
+        <h1>Done By Gwej</h1>
+        <div class="typing"></div>
+        <p class="sub-text">Welcome to My Personal Website 👋</p>
+    </section>
+
+<!-- Navbar -->
+<div class="navbar">
+    <a href="index.html" class="active"><i class="fas fa-home"></i> Home</a>
+    <a href="about.html"><i class="fas fa-user"></i> About</a>
+    <a href="portfolio.html"><i class="fas fa-briefcase"></i> Portfolio</a>
+    <a href="blog.html"><i class="fas fa-blog"></i> Blog</a>
+</div>
+
+    <!-- Particles.js Script -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script>
+        particlesJS("particles-js", {
+            "particles": {
+                "number": { "value": 100, "density": { "enable": true, "value_area": 800 }},
+                "color": { "value": "#00ff00" },
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.5, "random": true },
+                "size": { "value": 3, "random": true },
+                "move": { "enable": true, "speed": 2 }
+            }
+        });
+    </script>
+
+    <!-- Typing Effect -->
+    <script>
+        const typingText = "Web Developer, BotDev";
+        let i = 0;
+        function typeEffect() {
+            if (i < typingText.length) {
+                document.querySelector(".typing").innerHTML += typingText.charAt(i);
+                i++;
+                setTimeout(typeEffect, 100);
+            } else {
+                setTimeout(() => {
+                    document.querySelector(".typing").innerHTML = "";
+                    i = 0;
+                    typeEffect();
+                }, 2000);
+            }
+        }
+        typeEffect();
+    </script>
+
+</body>
+</html>'));</script>

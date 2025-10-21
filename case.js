@@ -239,7 +239,7 @@ Uptime: ${formatUptime(process.uptime())}
             case 'menu':
             case 'help': {
                 const menuText = `👑 Creator: Trashcore
-📝 Type: Base Script
+📝 Type: Multi Device 
 ⚡ Version: 3.0.0
 📦 Module: Case
 

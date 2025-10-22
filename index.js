@@ -9,7 +9,7 @@ Giddy Tennor(Trashcore)
 👑 |Github: Tennor-modz 
 ✉️ |Email: giddytennor@gmail.com
 */
-require('dotenv').config();
+
 const fs = require('fs');
 const pino = require('pino');
 const readline = require('readline');
@@ -50,10 +50,10 @@ const credsPath = path.join(sessionDir, 'creds.json');
 // helper to save SESSION_ID (base64) to session/creds.json
 async function saveSessionFromConfig() {
   try {
-    if (!process.env.SESSION_ID) return false;
-    if (!process.env.SESSION_ID.includes('trashcore~')) return false;
+    if (!config.SESSION_ID) return false;
+    if (!config.SESSION_ID.includes('trashcore~')) return false;
 
-    const base64Data = process.env.SESSION_ID.split("trashcore~")[1];
+    const base64Data = config.SESSION_ID.split("trashcore~")[1];
     if (!base64Data) return false;
 
     const sessionData = Buffer.from(base64Data, 'base64');
@@ -88,7 +88,7 @@ async function starttrashcore() {
   trashcore.ev.on('creds.update', saveCreds);
 
   // Pairing code if not registered
-  if (!trashcore.authState.creds.registered && (!process.env.SESSION_ID || process.env.SESSION_ID === "")) {
+  if (!trashcore.authState.creds.registered && (!config.SESSION_ID || config.SESSION_ID === "")) {
     try {
       const phoneNumber = await question(chalk.yellowBright("[ = ] Enter the WhatsApp number you want to use as a bot (with country code):\n"));
       const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
@@ -185,7 +185,7 @@ async function starttrashcore() {
 
 
 trashcore.ev.on('messages.upsert', async chatUpdate => {
-        	if (process.env.STATUS_VIEW){
+        	if (config.STATUS_VIEW){
           let  mek = chatUpdate.messages[0]
             if (mek.key && mek.key.remoteJid === 'status@broadcast') {
             	await trashcore.readMessages([mek.key]) }
@@ -294,7 +294,7 @@ async function tylor() {
       return;
     }
 
-    if (process.env.SESSION_ID && process.env.SESSION_ID.includes("trashcore~")) {
+    if (config.SESSION_ID && config.SESSION_ID.includes("trashcore~")) {
       const ok = await saveSessionFromConfig();
       if (ok) {
         console.log(chalk.greenBright("✅ Session ID loaded and saved successfully. Starting bot..."));

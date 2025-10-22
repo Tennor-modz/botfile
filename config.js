@@ -1,11 +1,25 @@
-require('dotenv').config();
-
 module.exports = {
-  BOT_NAME: process.env.BOT_NAME,
-  OWNER_NAME: process.env.OWNER_NAME,
-  OWNER_NUMBER: process.env.OWNER_NUMBER,
-  SESSION_DIR: process.env.SESSION_DIR,
-  SESSION_ID: process.env.SESSION_ID,
-  NO_PREFIX: process.env.NO_PREFIX === 'true',
-  STATUS_VIEW: process.env.STATUS_VIEW === 'true',
+  BOT_NAME: 'Trashcore',
+  OWNER_NAME: 'Trashvore',
+  OWNER_NUMBER: '255778104517',
+  SESSION_DIR: './trash_baileys',
+  NO_PREFIX: true,
+  STATUS_VIEW: true
 };
+
+
+
+
+
+
+/*
+> Recode script give credits to›
+Giddy Tennor(Trashcore)
+
+📝 | Created By Trashcore
+🖥️ | Base Ori By Trashcore 
+📌 |Credits Putrazy Xd
+📱 |Chat wa:254104245659
+👑 |Github: Tennor-modz 
+✉️ |Email: giddytennor@gmail.com
+*/

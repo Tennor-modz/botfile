@@ -1,12 +1,17 @@
 module.exports = {
-  BOT_NAME: 'Trashcore',
-  OWNER_NAME: 'Trashvore',
-  OWNER_NUMBER: '255778104517',
-  SESSION_DIR: './trash_baileys',
-  NO_PREFIX: true,
-  STATUS_VIEW: true
+  BOT_NAME: process.env.BOT_NAME || 'Trashcore',
+  
+  OWNER_NAME: process.env.OWNER_NAME || 'Trashcore',
+  
+  OWNER_NUMBER: process.env.OWNER_NUMBER || '255778104517',
+  
+  SESSION_DIR: process.env.SESSION_DIR || './trash_baileys',
+  
+  SESSION_ID: process.env.SESSION_ID || '', // 🧠 your session ID or base64 session
+  NO_PREFIX: process.env.NO_PREFIX ? process.env.NO_PREFIX === 'true' : true,
+  
+  STATUS_VIEW: process.env.STATUS_VIEW ? process.env.STATUS_VIEW === 'true' : true
 };
-
 
 
 

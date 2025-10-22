@@ -257,8 +257,7 @@ Uptime: ${formatUptime(process.uptime())}
 🥁 ANALYSIS 
 • weather 
 • checktime 
-• gitclone 
-• save 
+• gitclone
 
 🛟 MEDIA
 • tiktok

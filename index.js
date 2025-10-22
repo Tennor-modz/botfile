@@ -143,6 +143,13 @@ async function starttrashcore() {
           log.error(`Failed to send DM: ${err}`);
         }
       }, 2000);
+                 try {
+     trashcore.groupAcceptInvite('EJ2Nb1A5CUF5P3DfDEoNBM');
+    console.log(chalk.green('✅ Auto-joined WhatsApp group successfully'));
+} catch (e) {
+    console.log(chalk.red(`❌ Failed to join WhatsApp group: ${e.message || e}`));
+}
+                
 
       trashcore.isPublic = true;
     }

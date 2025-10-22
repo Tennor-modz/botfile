@@ -22,7 +22,7 @@ const path = require('path');
 const chalk = require('chalk');
 const { writeFile } = require('./library/utils');
 const { saveSettings,loadSettings } = require('./settingsManager');
-
+const { fetchJson } = require('./library/fetch'); // adjust path if necessary
 // =============== COLORS ===============
 const colors = {
     reset: "\x1b[0m",
@@ -164,6 +164,7 @@ if (isGroup && global.settings?.antitag?.[from]?.enabled) {
     }
   }
 }
+
 // 🚫 AntiBadWord with Strike System
 if (isGroup && global.settings?.antibadword?.[from]?.enabled) {
   const antibad = global.settings.antibadword[from];
@@ -252,12 +253,19 @@ Uptime: ${formatUptime(process.uptime())}
 • autoread 
 • autorecord 
 • autotyping 
-
+• checksettings 
+• setdp
 
 🥁 ANALYSIS 
 • weather 
 • checktime 
-• gitclone
+• gitclone 
+• repo
+• fact
+• claude-al
+• gitstalk
+• ssweb
+• whois
 
 🛟 MEDIA
 • tiktok
@@ -266,6 +274,7 @@ Uptime: ${formatUptime(process.uptime())}
 • fb
 • video 
 • playdoc
+• mediafire 
 
 👥 GROUP
 • add
@@ -279,6 +288,8 @@ Uptime: ${formatUptime(process.uptime())}
 • antibadword 
 • tagall
 • hidetag
+• mute
+• unmute
 
 📍 CONVERSION
 • toaudio 
@@ -287,13 +298,14 @@ Uptime: ${formatUptime(process.uptime())}
 
 👤 BASIC
 • copilot
+• getcase 
 • >
 • <
 • =>`;
                 const videoPath = './media/menu.mp4';
                 try {
                     await trashcore.sendMessage(from, {
-                        video: { url: videoPath },
+                        video: { url:"https://files.catbox.moe/oda45a.mp4"},
                         caption: stylishReply(menuText),
                         gifPlayback: true
                     }, { quoted: m });
@@ -304,69 +316,53 @@ Uptime: ${formatUptime(process.uptime())}
                 break;
             }
 
-            // ================= WEATHER =================
-case 'update': {
-  try {
-    if (!isOwner) return reply("⚠️ Only the bot owner can run this command!");
+            // ================= REPO =================
+case 'repo': {
+    const axios = require('axios');
+    const owner = "Tennor-modz";
+    const repo = "trashcore-ultra";
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}`;
+    const collabUrl = `https://api.github.com/repos/${owner}/${repo}/collaborators`;
 
-    const { exec } = require('child_process');
-    const fs = require('fs');
-    const path = require('path');
-    const config = require('./config');
+    await reply("📦 Fetching repository details...");
 
-    const REPO = config.REPO_URL || 'https://github.com/Fortunatusmokaya/botfiles-v2.git';
-    const DIR = path.join(__dirname, 'bot');
+    try {
+        const repoRes = await axios.get(apiUrl, { headers: { "User-Agent": "TrashcoreBot" } });
+        const data = repoRes.data;
 
-    // Detect Heroku
-    const isHeroku = !!(process.env.DYNO || process.env.HEROKU_APP_NAME);
-
-    reply("🔄 Checking for updates...");
-
-    if (isHeroku) {
-      // ⚡ Fast pull for Heroku deployments
-      exec('git pull origin main', (err, stdout, stderr) => {
-        if (err) {
-          console.error(err);
-          return reply(`❌ Update failed:\n${err.message}`);
+        let collabCount = 0;
+        try {
+            const collabRes = await axios.get(collabUrl, { headers: { "User-Agent": "TrashcoreBot" } });
+            collabCount = collabRes.data.length;
+        } catch {
+            collabCount = "Private/Hidden";
         }
-        if (stderr) console.log(stderr);
-        reply(`✅ *Heroku update successful!*\n\n${stdout}\n\nRestarting bot...`);
-        process.exit(0);
-      });
-    } else {
-      // 🧹 Full reclone for external servers/panels
-      if (fs.existsSync(DIR)) {
-        exec(`rm -rf ${DIR}`, (err) => {
-          if (err) return reply(`❌ Failed to remove old files:\n${err.message}`);
 
-          exec(`git clone --depth=1 ${REPO} ${DIR}`, (err, stdout, stderr) => {
-            if (err) return reply(`❌ Clone failed:\n${err.message}`);
-            if (stderr) console.log(stderr);
+        const msg = `
+╭━━━〔 *📦 TRASHCORE ULTRA REPO* 〕━━━╮
+│ 🔗 Repository: ${data.html_url}
 
-            reply("📦 Installing dependencies...");
-            exec(`cd ${DIR} && npm install --force`, (err, stdout, stderr) => {
-              if (err) return reply(`❌ NPM install failed:\n${err.message}`);
-              if (stderr) console.log(stderr);
+│ ⭐ Stars: ${data.stargazers_count}
+│ 🍴 Forks: ${data.forks_count}
 
-              reply("✅ Update complete! Restarting bot...");
-              process.exit(0);
-            });
-          });
-        });
-      } else {
-        exec(`git clone --depth=1 ${REPO} ${DIR}`, (err, stdout, stderr) => {
-          if (err) return reply(`❌ Clone failed:\n${err.message}`);
-          reply("✅ Bot folder created. Restarting bot...");
-          process.exit(0);
-        });
-      }
+│ 👥 Collaborators: ${collabCount}
+
+│ 🕒 Last Updated: ${new Date(data.updated_at).toLocaleString()}
+
+│ 🧑‍💻 Owner: ${data.owner.login}
+
+│ 🗂️ Language: ${data.language || "Unknown"}
+
+│ 📄 Description: "Trashcore multiple device (ultra)."}
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+`;
+
+        await reply(msg);
+    } catch (err) {
+        console.error(err);
+        await reply("❌ Failed to fetch repository info. Please try again later.");
     }
-
-  } catch (err) {
-    console.error(err);
-    reply("❌ Something went wrong while updating.");
-  }
-  break;
+    break;
 }
             // ================= WEATHER =================
             case 'weather': {
@@ -395,7 +391,213 @@ case 'update': {
                 }
                 break;
             }
+            
+// =================MEDIAFIRE=================
+case 'mediafire': {
+  try {
+    const url = args[0];
+    if (!url) return reply('📎 Please provide a MediaFire link.\n\nExample:\n.mediafire https://www.mediafire.com/file/...');
 
+    await reply('⏳ Fetching MediaFire download info...');
+
+    const fetch = require('node-fetch');
+    const apiUrl = `https://api.dreaded.site/api/mediafiredl?url=${encodeURIComponent(url)}`;
+
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      const text = await res.text();
+      data = { result: text };
+    }
+
+    const fileInfo = data.result || data.data || data.response || {};
+    const fileName = fileInfo.filename || fileInfo.name || 'unknown_file';
+    const fileSize = fileInfo.filesize || fileInfo.size || 'Unknown size';
+    const fileType = fileInfo.filetype || fileInfo.type || 'application/octet-stream';
+    const downloadUrl = fileInfo.link || fileInfo.url || fileInfo.download || null;
+
+    if (!downloadUrl) return reply('⚠️ Failed to get the download link. Try another MediaFire URL.');
+
+    // Calculate approximate file size in MB
+    const sizeMatch = fileSize.match(/([\d.]+)\s*(MB|GB|KB)/i);
+    let sizeMB = 0;
+    if (sizeMatch) {
+      const num = parseFloat(sizeMatch[1]);
+      const unit = sizeMatch[2].toUpperCase();
+      sizeMB = unit === 'GB' ? num * 1024 : unit === 'KB' ? num / 1024 : num;
+    }
+
+    // If file is small enough (≤100MB), download and send as ZIP
+    if (sizeMB > 0 && sizeMB <= 100) {
+      await reply(`📦 Downloading *${fileName}* (${fileSize})...`);
+
+      const buffer = await fetch(downloadUrl).then(res => res.buffer());
+
+      // Rename the file as .zip (even if it’s an APK or other format)
+      const zipFileName = fileName.endsWith('.zip') ? fileName : `${fileName}.zip`;
+
+      await trashcore.sendMessage(from, {
+        document: buffer,
+        mimetype: 'application/zip',
+        fileName: zipFileName,
+        caption: `📁 *MediaFire File Saved*\n\n🧾 *Name:* ${zipFileName}\n📏 *Size:* ${fileSize}\n✅ Sent as ZIP.`,
+      }, { quoted: m });
+
+    } else {
+      await reply(
+        `📁 *MediaFire File Found!*\n\n` +
+        `🧾 *Name:* ${fileName}\n` +
+        `📏 *Size:* ${fileSize}\n` +
+        `⚙️ *Type:* ${fileType}\n\n` +
+        `🔗 *Download:* ${downloadUrl}\n\n` +
+        `_File too large to send directly, please download using the link above._`
+      );
+    }
+
+  } catch (err) {
+    console.error('MediaFire Command Error:', err);
+    await reply(`❌ Failed to process MediaFire link.\nError: ${err.message}`);
+  }
+  break;
+}
+// =================WHOIS=================
+case 'whois': {
+  try {
+    if (!m.quoted && args.length === 0) 
+      return reply("❌ provide a user number (e.g., 2547xxxxxxx) to get info.");
+
+    const jid = m.quoted ? m.quoted.sender : `${args[0].replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+    
+    // Fetch profile picture
+    let ppUrl;
+    try {
+      ppUrl = await trashcore.profilePictureUrl(jid);
+    } catch {
+      ppUrl = 'https://i.ibb.co/0jqHpnp/No-Profile-Pic.png'; // fallback
+    }
+
+    // Fetch about/status
+    let about = 'Not set';
+    try {
+      const status = await trashcore.status(jid);
+      about = status.status || about;
+    } catch {}
+
+    // Format number
+    const number = jid.split('@')[0];
+
+    // Send profile picture with info caption
+    await trashcore.sendMessage(from, {
+      image: { url: ppUrl },
+      caption: `👤 *Whois Info:*\n\n• Number: +${number}\n• About: ${about}`
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error('❌ whois command error:', err);
+    await reply('💥 Failed to fetch user info.');
+  }
+  break;
+}
+
+// ================= SETDP=================
+case 'setdp': {
+  try {
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const fs = require('fs');
+    const path = require('path');
+    const tmp = require('os').tmpdir();
+
+    // ✅ Ensure user replied to an image
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    if (!quotedMsg || !quotedMsg.imageMessage) {
+      return reply("⚠️ Reply to an *image* to set it as bot profile picture!");
+    }
+
+    reply("📸 Updating profile picture...");
+
+    // ✅ Download image
+    const stream = await downloadContentFromMessage(quotedMsg.imageMessage, 'image');
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    // ✅ Temporary path
+    const tempFile = path.join(tmp, `dp_${Date.now()}.jpg`);
+    fs.writeFileSync(tempFile, buffer);
+
+    // ✅ Set bot profile picture
+    await trashcore.updateProfilePicture(trashcore.user.id, { url: tempFile });
+
+    // ✅ Cleanup
+    fs.unlinkSync(tempFile);
+
+    reply("✅ Bot profile picture updated!");
+  } catch (err) {
+    console.error("❌ setdp error:", err);
+    reply("💥 Failed to update bot profile picture.");
+  }
+  break;
+}
+// ================= CHATGPT=================
+case 'claude-al': {
+  try {
+    const question = args.join(' ');
+    if (!question) return reply('❌ Please provide a question. Usage: . claude-al <your question>');
+
+    await reply('💭 Asking Claude, please wait...');
+
+    const fetch = require('node-fetch');
+    const apiUrl = `https://savant-api.vercel.app/ai/claude?question=${encodeURIComponent(question)}`;
+
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+
+    // Try to parse JSON; fallback to text
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      const text = await res.text();
+      data = { answer: text };
+    }
+
+    console.log('Claude API response:', data);
+
+    const answer =
+      data.answer ||
+      data.response ||
+      data.result ||
+      data.output ||
+      data.text ||
+      "⚠️ No valid response received from API.";
+
+    await reply(`🤖 *Claude AI Response:*\n\n${answer}`);
+  } catch (err) {
+    console.error('ChatGPT Command Error:', err);
+    await reply(`❌ Failed to fetch response from Claude API.\nError: ${err.message}`);
+  }
+  break;
+}
+// ================= FACT =================
+case 'fact': {
+  try {
+    await reply('🔍 Fetching a random fact...');
+    const data = await fetchJson('https://api.dreaded.site/api/fact');
+
+    if (!data || !data.fact) {
+      return reply('❌ Could not fetch a fact. Try again later.');
+    }
+
+    await reply(`💡 Random Fact:\n\n${data.fact}`);
+  } catch (err) {
+    console.error('Fact Command Error:', err);
+    await reply('❌ Failed to fetch a fact. Please try again.');
+  }
+  break;
+}
             // ================= CHECKTIME =================
             case 'checktime':
             case 'time': {
@@ -425,6 +627,120 @@ ${greeting} 👋
                 }
                 break;
             }
+            
+// =================MUTE=================
+case 'mute': {
+    if (!m.isGroup) return reply('🚫 This command only works in groups.');
+
+    const metadata = await trashcore.groupMetadata(from);
+    const isAdmin = metadata.participants.some(p => p.id === m.sender && p.admin);
+    if (!isAdmin) return reply('⚠️ Only admins can enable admin-only mode.');
+
+    try {
+        await trashcore.groupSettingUpdate(from, 'announcement'); // announcement mode = only admins can send messages
+        await trashcore.sendMessage(from, { text: '🔒 Group is now *admin-only*. Only admins can send messages.' }, { quoted: m });
+    } catch (err) {
+        console.error('Admin-only error:', err);
+        await trashcore.sendMessage(from, { text: `❌ Failed to enable admin-only mode.\nError: ${err.message}` }, { quoted: m });
+    }
+    break;
+}
+
+// =================UNMUTE=================
+case 'unmute': {
+    if (!m.isGroup) return reply('🚫 This command only works in groups.');
+
+    const metadata = await trashcore.groupMetadata(from);
+    const isAdmin = metadata.participants.some(p => p.id === m.sender && p.admin);
+    if (!isAdmin) return reply('⚠️ Only admins can revert admin-only mode.');
+
+    try {
+        await trashcore.groupSettingUpdate(from, 'not_announcement'); // normal mode = everyone can send messages
+        await trashcore.sendMessage(from, { text: '🔓 Group is now open. Everyone can send messages.' }, { quoted: m });
+    } catch (err) {
+        console.error('Everyone mode error:', err);
+        await trashcore.sendMessage(from, { text: `❌ Failed to open group.\nError: ${err.message}` }, { quoted: m });
+    }
+    break;
+}
+// =================SSWEB=================
+case 'ssweb': {
+  try {
+    const url = args[0];
+    if (!url) return reply('🌐 Please provide a valid URL.\nExample: .ssweb https://example.com');
+
+    await reply('🖼️ Capturing screenshot, please wait...');
+
+    const fetch = require('node-fetch');
+    const apiUrl = `https://api.zenzxz.my.id/api/tools/ssweb?url=${encodeURIComponent(url)}`;
+
+    // Fetch as binary (buffer), not JSON
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    const buffer = await res.buffer();
+
+    // Send the image
+    await trashcore.sendMessage(from, {
+      image: buffer,
+      caption: `🖥️ *Screenshot of:* ${url}`,
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error('ssweb Command Error:', err);
+    await reply(`❌ Failed to capture screenshot.\nError: ${err.message}`);
+  }
+  break;
+}
+// =================GIT STALK=================
+case 'githubstalk':
+case 'gitstalk': {
+  try {
+    const username = args[0];
+    if (!username) return reply('👤 Please provide a GitHub username.\n\nExample:\n.githubstalk Tennor-modz');
+
+    await reply(`🔍 Fetching GitHub profile for *${username}*...`);
+
+    const fetch = require('node-fetch');
+    const apiUrl = `https://savant-api.vercel.app/stalk/github?user=${encodeURIComponent(username)}`;
+
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status} - Failed to fetch user data`);
+
+    const data = await res.json();
+    const user = data.result || data.data || data || {};
+
+    // If no username returned, user not found
+    if (!user.username && !user.name) return reply(`⚠️ User *${username}* not found on GitHub.`);
+
+    // Prepare caption message
+    const caption = `🧑‍💻 *GitHub Stalk Result*\n\n` +
+      `👤 *Name:* ${user.name || "N/A"}\n` +
+      `💻 *Username:* ${user.username || username}\n` +
+      `📜 *Bio:* ${user.bio || "N/A"}\n` +
+      `📍 *Location:* ${user.location || "N/A"}\n` +
+      `🏢 *Company:* ${user.company || "N/A"}\n` +
+      `📦 *Public Repos:* ${user.public_repos || "0"}\n` +
+      `🧑‍🤝‍🧑 *Followers:* ${user.followers || "0"}\n` +
+      `🫱 *Following:* ${user.following || "0"}\n` +
+      `⭐ *Created:* ${user.created_at || "Unknown"}\n\n` +
+      `🔗 *Profile:* ${user.html_url || `https://github.com/${username}`}`;
+
+    // Send with avatar if available
+    if (user.avatar_url) {
+      await trashcore.sendMessage(from, {
+        image: { url: user.avatar_url },
+        caption,
+      }, { quoted: m });
+    } else {
+      await reply(caption);
+    }
+
+  } catch (err) {
+    console.error("GitHubStalk Command Error:", err);
+    await reply(`❌ Failed to fetch GitHub user data.\nError: ${err.message}`);
+  }
+  break;
+}
  // =================CHECK SETTINGS=================
 case 'checksettings': {
   try {
@@ -491,24 +807,6 @@ Last updated: ${new Date().toLocaleString()}
             }
 
 
-            // ================= SAVE STATUS =================
-            case 'save': {
-                try {
-                    if (!quoted) return reply("❌ Reply to a status message!");
-                    const mediaBuffer = await trashcore.downloadMediaMessage(quoted);
-                    if (!mediaBuffer) return reply("🚫 Could not download media. It may have expired.");
-                    let payload;
-                    if (quoted.imageMessage) payload = { image: mediaBuffer, caption: quoted.imageMessage.caption || "📸 Saved status image", mimetype: "image/jpeg" };
-                    else if (quoted.videoMessage) payload = { video: mediaBuffer, caption: quoted.videoMessage.caption || "🎥 Saved status video", mimetype: "video/mp4" };
-                    else return reply("❌ Only image/video statuses are supported!");
-                    await trashcore.sendMessage(m.sender, payload, { quoted: m });
-                    await reply("✅ Status saved!");
-                } catch (err) {
-                    console.error("Save error:", err);
-                    reply("❌ Failed to save status.");
-                }
-                break;
-            }
 
             // ================= IG/FB DL =================
             case 'fb':
@@ -768,162 +1066,206 @@ case 'video': {
                 }
                 break;
             }
+// ================= GET CASE  =================
+case 'getcase': {
+if (!isOwner) return reply("❌ This command is for owner-only.");
+  try {
+    const cmdName = args[0]?.toLowerCase();
+    if (!cmdName) return reply('❌ Please provide a command name. Usage: .getcase <command>');
+
+    const fs = require('fs');
+    const path = require('path');
+
+    const commandsFile = path.join(__dirname, 'case.js'); // adjust to your commands file
+    if (!fs.existsSync(commandsFile)) return reply('❌ Commands file not found.');
+
+    const content = fs.readFileSync(commandsFile, 'utf8');
+
+    // Regex to match the case block
+    const regex = new RegExp(`case '${cmdName}':[\\s\\S]*?break;`, 'i');
+    const match = content.match(regex);
+
+    if (!match) return reply(`❌ Could not find the case for command: ${cmdName}`);
+
+    const caseText = match[0];
+
+    // Save to temp .js file
+    const tempPath = path.join(__dirname, `${cmdName}_case.js`);
+    fs.writeFileSync(tempPath, caseText);
+
+    // Send the file
+    await trashcore.sendMessage(from, {
+      document: fs.readFileSync(tempPath),
+      fileName: `${cmdName}_case.js`,
+      mimetype: 'application/javascript'
+    }, { quoted: m });
+
+    // Delete temp file
+    fs.unlinkSync(tempPath);
+
+  } catch (err) {
+    console.error('Getcase Command Error:', err);
+    await reply(`❌ Failed to get case.\n${err.message}`);
+  }
+  break;
+}
 // ================= TO AUDIO  =================
 case 'toaudio': {
-    try {
-        const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-        const ffmpeg = require('fluent-ffmpeg');
-        const { writeFileSync, unlinkSync } = require('fs');
-        const { tmpdir } = require('os');
-        const path = require('path');
+  try {
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const ffmpeg = require('fluent-ffmpeg');
+    const fs = require('fs');
+    const { tmpdir } = require('os');
+    const path = require('path');
 
-        // ✅ Pick source message
-        const quoted = m.quoted ? m.quoted : m;
-        const msg = quoted.msg || quoted.message?.videoMessage || quoted.message?.audioMessage;
+    // ✅ Get the media message
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg = (quotedMsg && (quotedMsg.videoMessage || quotedMsg.audioMessage)) 
+                || m.message?.videoMessage 
+                || m.message?.audioMessage;
 
-        if (!msg) return reply("🎧 Reply to a *video* or *audio* to convert it to audio!");
+    if (!msg) return reply("🎧 Reply to a *video* or *audio* to convert it to audio!");
 
-        // ✅ Get MIME type
-        const mime = msg.mimetype || quoted.mimetype || '';
-        if (!/video|audio/.test(mime)) return reply("⚠️ Only works on *video* or *audio* messages!");
+    const mime = msg.mimetype || '';
+    if (!/video|audio/.test(mime)) return reply("⚠️ Only works on *video* or *audio* messages!");
 
-        reply("🎶 Converting to audio...");
+    reply("🎶 Converting to audio...");
 
-        // ✅ Download media
-        const messageType = mime.split("/")[0];
-        const stream = await downloadContentFromMessage(msg, messageType);
+    // ✅ Download media
+    const stream = await downloadContentFromMessage(msg, mime.split("/")[0]);
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+    // ✅ Temp paths
+    const inputPath = path.join(tmpdir(), `input_${Date.now()}.mp4`);
+    const outputPath = path.join(tmpdir(), `output_${Date.now()}.mp3`);
+    fs.writeFileSync(inputPath, buffer);
 
-        // ✅ Temporary paths
-        const inputPath = path.join(tmpdir(), `input_${Date.now()}.mp4`);
-        const outputPath = path.join(tmpdir(), `output_${Date.now()}.mp3`);
-        writeFileSync(inputPath, buffer);
+    // ✅ Convert using ffmpeg
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .toFormat('mp3')
+        .on('end', resolve)
+        .on('error', reject)
+        .save(outputPath);
+    });
 
-        // ✅ Convert using ffmpeg
-        await new Promise((resolve, reject) => {
-            ffmpeg(inputPath)
-                .toFormat('mp3')
-                .on('end', resolve)
-                .on('error', reject)
-                .save(outputPath);
-        });
+    // ✅ Send converted audio
+    const audioBuffer = fs.readFileSync(outputPath);
+    await trashcore.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: m });
 
-        // ✅ Send converted audio
-        const audioBuffer = fs.readFileSync(outputPath);
-        await trashcore.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: m });
+    // ✅ Cleanup
+    fs.unlinkSync(inputPath);
+    fs.unlinkSync(outputPath);
 
-        // ✅ Cleanup
-        unlinkSync(inputPath);
-        unlinkSync(outputPath);
-
-        reply("✅ Conversion complete!");
-    } catch (err) {
-        console.error("❌ toaudio error:", err);
-        reply("💥 Failed to convert media to audio. Ensure it's a valid video/audio file.");
-    }
-    break;
+    reply("✅ Conversion complete!");
+  } catch (err) {
+    console.error("❌ toaudio error:", err);
+    reply("💥 Failed to convert media to audio. Ensure it's a valid video/audio file.");
+  }
+  break;
 }
 
 // ================= TO VOICE NOTE  =================
 case 'tovoicenote': {
-    try {
-        const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-        const ffmpeg = require('fluent-ffmpeg');
-        const fs = require('fs');
-        const path = require('path');
-        const { tmpdir } = require('os');
+  try {
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const ffmpeg = require('fluent-ffmpeg');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
 
-        // ✅ Determine source message
-        const quoted = m.quoted ? m.quoted : m;
-        const msg = quoted.msg || quoted.message?.videoMessage || quoted.message?.audioMessage;
+    // ✅ Get media message
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg = (quotedMsg && (quotedMsg.videoMessage || quotedMsg.audioMessage))
+                || m.message?.videoMessage
+                || m.message?.audioMessage;
 
-        if (!msg) return reply("🎧 Reply to a *video* or *audio* to convert it to a voice note!");
+    if (!msg) return reply("🎧 Reply to a *video* or *audio* to convert it to a voice note!");
 
-        const mime = msg.mimetype || quoted.mimetype || '';
-        if (!/video|audio/.test(mime)) return m.reply("⚠️ Only works on *video* or *audio* messages!");
+    const mime = msg.mimetype || '';
+    if (!/video|audio/.test(mime)) return reply("⚠️ Only works on *video* or *audio* messages!");
 
-        reply("🔊 Converting to voice note...");
+    reply("🔊 Converting to voice note...");
 
-        // ✅ Download media
-        const messageType = mime.split("/")[0];
-        const stream = await downloadContentFromMessage(msg, messageType);
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+    // ✅ Download media
+    const messageType = mime.split("/")[0];
+    const stream = await downloadContentFromMessage(msg, messageType);
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-        // ✅ Temp files
-        const inputPath = path.join(tmpdir(), `input_${Date.now()}.mp4`);
-        const outputPath = path.join(tmpdir(), `output_${Date.now()}.ogg`);
-        fs.writeFileSync(inputPath, buffer);
+    // ✅ Temp files
+    const inputPath = path.join(tmpdir(), `input_${Date.now()}.mp4`);
+    const outputPath = path.join(tmpdir(), `output_${Date.now()}.ogg`);
+    fs.writeFileSync(inputPath, buffer);
 
-        // ✅ Convert to PTT using ffmpeg (Opus in OGG)
-        await new Promise((resolve, reject) => {
-            ffmpeg(inputPath)
-                .inputOptions('-t 59') // optional: limit duration to 59s
-                .toFormat('opus')
-                .outputOptions(['-c:a libopus', '-b:a 64k'])
-                .on('end', resolve)
-                .on('error', reject)
-                .save(outputPath);
-        });
+    // ✅ Convert to PTT (Opus in OGG)
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .inputOptions('-t 59') // optional: limit duration
+        .toFormat('opus')
+        .outputOptions(['-c:a libopus', '-b:a 64k'])
+        .on('end', resolve)
+        .on('error', reject)
+        .save(outputPath);
+    });
 
-        // ✅ Send voice note
-        const audioBuffer = fs.readFileSync(outputPath);
-        await trashcore.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/ogg', ptt: true }, { quoted: m });
+    // ✅ Send as voice note
+    const audioBuffer = fs.readFileSync(outputPath);
+    await trashcore.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/ogg', ptt: true }, { quoted: m });
 
-        // ✅ Cleanup
-        fs.unlinkSync(inputPath);
-        fs.unlinkSync(outputPath);
+    // ✅ Cleanup
+    fs.unlinkSync(inputPath);
+    fs.unlinkSync(outputPath);
 
-        reply("✅ Voice note sent!");
-    } catch (err) {
-        console.error("❌ tovoicenote error:", err);
-        m.reply("💥 Failed to convert media to voice note. Make sure it is a valid video/audio file.");
-    }
-    break;
+    reply("✅ Voice note sent!");
+  } catch (err) {
+    console.error("❌ tovoicenote error:", err);
+    reply("💥 Failed to convert media to voice note. Ensure it is a valid video/audio file.");
+  }
+  break;
 }
 // ================= TO IMAGE =================
 case 'toimage': {
-    try {
-        const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-        const fs = require('fs');
-        const path = require('path');
-        const { tmpdir } = require('os');
-        const sharp = require('sharp');
+  try {
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+    const sharp = require('sharp');
 
-        // ✅ Determine source message
-        const quoted = m.quoted ? m.quoted : m;
-        const msg = quoted.msg || quoted.message?.stickerMessage;
-        if (!msg || !msg.mimetype?.includes('webp')) {
-            return reply("⚠️ Reply to a *sticker* to convert it to an image!");
-        }
+    // ✅ Get sticker message
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const stickerMsg = (quotedMsg && quotedMsg.stickerMessage) || m.message?.stickerMessage;
 
-        m.reply("🖼️ Converting sticker to image...");
-
-        // ✅ Download sticker
-        const stream = await downloadContentFromMessage(msg, 'sticker');
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-        // ✅ Convert WebP to PNG using sharp
-        const outputPath = path.join(tmpdir(), `sticker_${Date.now()}.png`);
-        await sharp(buffer).png().toFile(outputPath);
-
-        // ✅ Send converted image
-        const imageBuffer = fs.readFileSync(outputPath);
-        await trashcore.sendMessage(from, { image: imageBuffer }, { quoted: m });
-
-        // ✅ Cleanup
-        fs.unlinkSync(outputPath);
-        reply("✅ Sticker converted to image!");
-    } catch (err) {
-        console.error("❌ toimage error:", err);
-        reply("💥 Failed to convert sticker to image.");
+    if (!stickerMsg || !stickerMsg.mimetype?.includes('webp')) {
+      return reply("⚠️ Reply to a *sticker* to convert it to an image!");
     }
-    break;
-}
 
+    m.reply("🖼️ Converting sticker to image...");
+
+    // ✅ Download sticker
+    const stream = await downloadContentFromMessage(stickerMsg, 'sticker');
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    // ✅ Convert WebP to PNG using sharp
+    const outputPath = path.join(tmpdir(), `sticker_${Date.now()}.png`);
+    await sharp(buffer).png().toFile(outputPath);
+
+    // ✅ Send converted image
+    const imageBuffer = fs.readFileSync(outputPath);
+    await trashcore.sendMessage(from, { image: imageBuffer }, { quoted: m });
+
+    // ✅ Cleanup
+    fs.unlinkSync(outputPath);
+    reply("✅ Sticker converted to image!");
+  } catch (err) {
+    console.error("❌ toimage error:", err);
+    reply("💥 Failed to convert sticker to image.");
+  }
+  break;
+}
 // ================= PRIVATE / SELF COMMAND =================
 case 'private':
 case 'self': {
@@ -1060,6 +1402,8 @@ const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
   }
   break;
 }
+
+
 // ================= AUTORECORD =================
 case 'autorecord': {
   try {
@@ -1095,6 +1439,59 @@ case 'autorecord': {
   } catch (err) {
     console.error("Autorecord Command Error:", err);
     reply("💥 Error while updating autorecord settings.");
+  }
+  break;
+}
+
+case 'antibot': {
+  try {
+    if (!isGroup) return reply("⚠️ This command only works in groups!");
+    
+    const groupMeta = await trashcore.groupMetadata(from);
+    const groupAdmins = groupMeta.participants.filter(p => p.admin).map(p => p.id);
+    const isAdmin = groupAdmins.includes(sender);
+
+    if (!isAdmin) return reply("⚠️ Only group admins can run this command!");
+
+    await reply("🤖 Scanning group for suspected bot accounts...");
+
+    // Heuristic checks for bots
+    const suspectedBots = groupMeta.participants.filter(p => {
+      const hasBotInId = p.id.toLowerCase().includes('bot'); // id contains "bot"
+      const noProfilePic = !p.picture || p.picture === null; // no profile picture
+      const defaultStatus = !p.status || p.status === null; // default WhatsApp status
+      return hasBotInId || (noProfilePic && defaultStatus);
+    });
+
+    if (suspectedBots.length === 0) {
+      return reply("✅ No suspected bots detected in this group.");
+    }
+
+    // Warn first
+    let botListText = suspectedBots.map((b, i) => `${i + 1}. @${b.id.split('@')[0]}`).join('\n');
+    await trashcore.sendMessage(from, {
+      text: `⚠️ Suspected bot accounts detected:\n\n${botListText}\n\nThese accounts will be removed in 10 seconds.`,
+      mentions: suspectedBots.map(b => b.id)
+    });
+
+    // Wait 10 seconds for manual cancellation
+    await new Promise(res => setTimeout(res, 10000));
+
+    // Remove suspected bots
+    let removedCount = 0;
+    for (const bot of suspectedBots) {
+      try {
+        await trashcore.groupParticipantsUpdate(from, [bot.id], 'remove');
+        removedCount++;
+      } catch (err) {
+        console.error(`❌ Failed to remove ${bot.id}:`, err.message);
+      }
+    }
+
+    reply(`⚠️ Removed ${removedCount} suspected bot(s) from the group!`);
+  } catch (err) {
+    console.error("❌ antibot error:", err);
+    reply("💥 Failed to scan/remove bots. Make sure I'm an admin!");
   }
   break;
 }
@@ -1553,7 +1950,7 @@ const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
         } else if (m.quoted && m.quoted.key.participant) {
             target = m.quoted.key.participant;
         } else {
-            return reply("👤 Mention or reply to the user you want to promote.");
+            return reply("👤 Mention the user you want to promote.");
         }
 
         const targetNumber = target.replace(/[^0-9]/g, '');

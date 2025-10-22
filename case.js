@@ -252,7 +252,7 @@ Uptime: ${formatUptime(process.uptime())}
 • autoread 
 • autorecord 
 • autotyping 
-• checksettings 
+
 
 🥁 ANALYSIS 
 • weather 

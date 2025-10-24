@@ -20,6 +20,7 @@ const fetch = require('node-fetch');
 const { exec } = require('child_process');
 const path = require('path');
 const chalk = require('chalk');
+const os = require('os');
 const { writeFile } = require('./library/utils');
 const { saveSettings,loadSettings } = require('./settingsManager');
 const { fetchJson } = require('./library/fetch'); // adjust path if necessary
@@ -88,6 +89,7 @@ const isOwner = senderJid === botNumber;
 
     const body = m.message.conversation || m.message.extendedTextMessage?.text || '';
     const args = body.trim().split(/ +/).slice(1);
+    const q = args.join(" ");
     const text = args.join(" ");
 
     const time = new Date().toLocaleTimeString();
@@ -217,6 +219,28 @@ if (isGroup && global.settings?.antibadword?.[from]?.enabled) {
 }
 
 
+// Your platform detection function
+function detectPlatform() {
+  if (process.env.DYNO) return "Heroku";
+  if (process.env.RENDER) return "Render";
+  if (process.env.PREFIX && process.env.PREFIX.includes("termux")) return "Termux";
+  if (process.env.PORTS && process.env.CYPHERX_HOST_ID) return "CypherX Platform";
+  if (process.env.P_SERVER_UUID) return "Panel";
+  if (process.env.LXC) return "Linux Container (LXC)";
+
+  switch (os.platform()) {
+    case "win32":
+      return "Windows";
+    case "darwin":
+      return "macOS";
+    case "linux":
+      return "Linux";
+    default:
+      return "Unknown";
+  }
+}
+
+
 if (!trashcore.isPublic && !isOwner) {
     return; // ignore all messages from non-owner when in private mode
 }
@@ -237,12 +261,50 @@ Uptime: ${formatUptime(process.uptime())}
             }
 
             // ================= MENU =================
-            case 'menu':
-            case 'help': {
-                const menuText = `👑 Creator: Trashcore
-📝 Type: Multi Device 
+case 'menu':
+case 'help': {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const process = require('process');
+
+  const settingsFile = path.join(__dirname, 'menuSettings.json');
+  if (!fs.existsSync(settingsFile)) {
+    fs.writeFileSync(settingsFile, JSON.stringify({ mode: 'text' }, null, 2));
+  }
+
+  const { mode, imageUrl, videoUrl } = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+
+  const usersFile = path.join(__dirname, 'library', 'users.json');
+  if (!fs.existsSync(usersFile)) fs.writeFileSync(usersFile, JSON.stringify([]));
+
+  let users = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
+  if (!users.includes(sender)) {
+    users.push(sender);
+    fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+  }
+
+  const caseFile = path.join(__dirname, 'case.js');
+  const caseContent = fs.readFileSync(caseFile, 'utf8');
+  const totalCommands = (caseContent.match(/case\s+['"`]/g) || []).length;
+
+  const uptime = process.uptime();
+  const uptimeFormatted = new Date(uptime * 1000).toISOString().substr(11, 8);
+  const ramUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+  const totalUsers = users.length;
+  const host = detectPlatform(); 
+  const menuText = `
+👑 *Trashcore Bot*
+📝 Type: Multi Device
 ⚡ Version: 3.0.0
 📦 Module: Case
+
+🧠 *Stats*
+• Uptime: ${uptimeFormatted}
+• RAM Usage: ${ramUsage} MB
+• Users: ${totalUsers}
+• Commands: ${totalCommands}
+• Server: ${host}
 
 |COMMANDS|
 
@@ -255,6 +317,10 @@ Uptime: ${formatUptime(process.uptime())}
 • autotyping 
 • checksettings 
 • setdp
+• setmenu
+• setmenuimage
+• setmenuvideo
+• setprefix
 
 🥁 ANALYSIS 
 • weather 
@@ -266,6 +332,7 @@ Uptime: ${formatUptime(process.uptime())}
 • gitstalk
 • ssweb
 • whois
+• scan
 
 🛟 MEDIA
 • tiktok
@@ -296,26 +363,386 @@ Uptime: ${formatUptime(process.uptime())}
 • tovoicenote 
 • toimage
 
+🤠 DEVELOPER 
+• addcase
+• addfile
+• delcase
+• delfile
+• restart 
+
 👤 BASIC
 • copilot
+• cat
 • getcase 
+• ls
 • >
 • <
-• =>`;
-                const videoPath = './media/menu.mp4';
-                try {
-                    await trashcore.sendMessage(from, {
-                        video: { url:"https://files.catbox.moe/oda45a.mp4"},
-                        caption: stylishReply(menuText),
-                        gifPlayback: true
-                    }, { quoted: m });
-                } catch (err) {
-                    console.error('Menu video failed:', err);
-                    await reply(menuText);
-                }
-                break;
-            }
+• =>
+`;
 
+  // Send based on selected mode
+if (mode === 'text') {
+  await trashcore.sendMessage(from, { text: stylishReply(menuText) }, { quoted: m });
+} else if (mode === 'image') {
+  await trashcore.sendMessage(from, {
+    image: { url: imageUrl || 'https://url.bwmxmd.online/Adams.tnn0fm6w.jpg' },
+    caption: stylishReply(menuText)
+  }, { quoted: m });
+} else if (mode === 'video') {
+  await trashcore.sendMessage(from, {
+    video: { url: videoUrl || 'https://url.bwmxmd.online/Adams.wp4n244r.mp4' },
+    caption: stylishReply(menuText),
+    gifPlayback: true
+  }, { quoted: m });
+}
+
+  break;
+}
+   
+// ================= SETPREFIX =================
+case 'setprefix': {
+    try {
+        const fs = require('fs');
+        const prefixSettingsPath = './library/prefixSettings.json';
+        const from = m.key.remoteJid;
+        const sender = m.key.participant || from;
+
+        if (!args[0]) {
+            return reply(`⚠️ Please provide a prefix!\nExample: setprefix .\nOr use 'none' to remove the prefix`);
+        }
+
+        let newPrefix = args[0].toLowerCase();
+        if (newPrefix === 'none') newPrefix = '';
+
+        // Save the new prefix
+        const prefixSettings = { prefix: newPrefix };
+        fs.writeFileSync(prefixSettingsPath, JSON.stringify(prefixSettings, null, 2));
+
+        reply(`✅ Prefix successfully set to: ${newPrefix === '' ? 'none (no prefix required)' : newPrefix}`);
+    } catch (err) {
+        console.error(err);
+        reply('💥 Failed to set prefix!');
+    }
+    break;
+}
+// ================= SET MENU =================
+            case 'setmenu': {
+  if (!isOwner) return reply("❌ Only the bot owner can use this command!");
+
+  const fs = require('fs');
+  const path = require('path');
+  const settingsFile = path.join(__dirname, 'menuSettings.json');
+
+  // Ensure file exists
+  if (!fs.existsSync(settingsFile)) {
+    fs.writeFileSync(settingsFile, JSON.stringify({ mode: 'text' }, null, 2));
+  }
+
+  const type = args[0]?.toLowerCase();
+
+  if (!type || !['text', 'image', 'video'].includes(type)) {
+    return reply(`⚙️ Usage:
+.setmenu text
+.setmenu image
+.setmenu video
+
+Current types:
+- text = send menu as plain text
+- image = send menu with a photo
+- video = send menu with a looping gif`);
+  }
+
+  fs.writeFileSync(settingsFile, JSON.stringify({ mode: type }, null, 2));
+
+  await reply(`✅ Menu display updated successfully!\nNew mode: *${type.toUpperCase()}*`);
+  break;
+}
+
+// ================= SETMENU IMAGE=================
+case 'setmenuimage': {
+  if (!isOwner) return reply("❌ Owner-only command!");
+
+  const fs = require('fs');
+  const path = require('path');
+  const settingsFile = path.join(__dirname, 'menuSettings.json');
+
+  if (!fs.existsSync(settingsFile)) {
+    fs.writeFileSync(settingsFile, JSON.stringify({ mode: 'text' }, null, 2));
+  }
+
+  const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+  const url = args[0];
+
+  if (!url) return reply(`⚙️ Usage:\n.setmenuimage <image_url>\n\nExample:\n.setmenuimage https://files.catbox.moe/oda45a.jpg`);
+  if (!/^https?:\/\/\S+\.(jpg|jpeg|png|gif)$/i.test(url)) {
+    return reply("❌ Invalid image URL. Please use a valid link ending with .jpg, .png, or .gif");
+  }
+
+  settings.imageUrl = url;
+  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+
+  await reply(`✅ Menu image updated successfully!\n🖼️ New Image: ${url}`);
+  break;
+}
+ // =================SET VIDEO MENU=================
+case 'setmenuvideo': {
+  if (!isOwner) return reply("❌ Owner-only command!");
+
+  const fs = require('fs');
+  const path = require('path');
+  const settingsFile = path.join(__dirname, 'menuSettings.json');
+
+  if (!fs.existsSync(settingsFile)) {
+    fs.writeFileSync(settingsFile, JSON.stringify({ mode: 'text' }, null, 2));
+  }
+
+  const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+  const url = args[0];
+
+  if (!url) return reply(`⚙️ Usage:\n.setmenuvideo <video_url>\n\nExample:\n.setmenuvideo https://files.catbox.moe/oda45a.mp4`);
+  if (!/^https?:\/\/\S+\.(mp4|mov|webm)$/i.test(url)) {
+    return reply("❌ Invalid video URL. Please use a valid link ending with .mp4, .mov, or .webm");
+  }
+
+  settings.videoUrl = url;
+  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+
+  await reply(`✅ Menu video updated successfully!\n🎞️ New Video: ${url}`);
+  break;
+}
+// ================= PINTEREST =================
+case 'scan': {
+  try {
+const fs = require('fs');
+    const os = require('os');
+    const process = require('process');
+    const path = require('path');
+
+    // --- Users ---
+    const usersFile = path.join(__dirname, 'library', 'users.json');
+    if (!fs.existsSync(usersFile)) fs.writeFileSync(usersFile, JSON.stringify([]));
+    const users = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
+
+    // --- Commands ---
+    const caseFile = path.join(__dirname, 'case.js');
+    const caseContent = fs.readFileSync(caseFile, 'utf8');
+    const totalCommands = (caseContent.match(/case\s+['"`]/g) || []).length;
+
+    // --- Uptime & RAM ---
+    const uptime = process.uptime();
+    const uptimeFormatted = new Date(uptime * 1000).toISOString().substr(11, 8);
+    const ramUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+
+    // --- Menu settings ---
+    const menuSettingsPath = path.join(__dirname, 'menuSettings.json');
+    let menuSettings = { mode: 'text', imageUrl: 'default', videoUrl: 'default' };
+    if (fs.existsSync(menuSettingsPath)) {
+      menuSettings = JSON.parse(fs.readFileSync(menuSettingsPath, 'utf8'));
+    }
+
+    const host = detectPlatform(); // call your function here
+
+    const statusText = `
+🔎 *BOT SCAN STATUS*
+
+🧠 *Stats*
+• Uptime: ${uptimeFormatted}
+• RAM Usage: ${ramUsage} MB
+• Users: ${users.length}
+• Total Commands: ${totalCommands}
+
+🎨 *Menu Settings*
+• Mode: ${menuSettings.mode}
+• Image URL: ${menuSettings.imageUrl || 'default'}
+• Video URL: ${menuSettings.videoUrl || 'default'}
+
+💻 *System Info*
+• Host: ${host}   <-- here
+• Platform: ${os.platform()}
+• CPU Cores: ${os.cpus().length}
+• Total Memory: ${(os.totalmem() / 1024 / 1024).toFixed(2)} MB
+• Free Memory: ${(os.freemem() / 1024 / 1024).toFixed(2)} MB
+`;
+
+    await trashcore.sendMessage(from, { text: statusText.trim() }, { quoted: m });
+
+  } catch (err) {
+    console.error('Scan Error:', err);
+    reply('💥 Failed to scan bot status!');
+  }
+  break;
+}
+            // ================= PINTEREST =================
+case 'pinterest': {
+  try {
+    const fetch = require('node-fetch');
+    const query = args.join(' ');
+    
+    if (!query) return reply('⚠️ Please provide a search term. Usage: .pinterest <search term>');
+    
+    await reply(`🔍 Searching Pinterest for "${query}"...`);
+    
+    const apiUrl = `https://casper-tech-apis.vercel.app/api/search/pinterest?q=${encodeURIComponent(query)}`;
+    const res = await fetch(apiUrl);
+    
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    
+    const data = await res.json();
+    
+    // Check the correct response structure
+    if (!data || !data.success || !data.images || data.images.length === 0) {
+      return reply('❌ No images found.');
+    }
+    
+    // Get the first image from the images array
+    const imageUrl = data.images[0].imageUrl; // or .originalUrl
+    
+    // Send the image to WhatsApp
+    await trashcore.sendMessage(from, { 
+      image: { url: imageUrl }, 
+      caption: `📌 Pinterest Result for "${query}"\n\n🎨 ${data.images[0].name}\n📊 Found ${data.totalResults} results` 
+    }, { quoted: m });
+    
+  } catch (err) {
+    console.error('Pinterest command error:', err);
+    await reply(`💥 Error retrieving Pinterest image: ${err.message}`);
+  }
+  break;
+}
+            // ================= Is =================
+case 'ls': {
+    const { exec } = require('child_process');
+
+    if (!isOwner) return reply('❌ Only the bot owner can use this command.');
+
+    const dir = (args && args[0]) ? args[0] : '.';
+
+    exec(`ls ${dir}`, (err, stdout, stderr) => {
+        if (err) return reply(`❌ Error:\n${stderr || err.message}`);
+        if (!stdout) return reply('📂 Directory is empty.');
+
+        // Send as text message
+        reply(`📂 Directory listing:\n\n${stdout}`);
+    });
+    break;
+}
+// ================= CLEAR CACHE=================
+case 'clearcache': {
+  if (!isOwner) return reply("❌ Owner-only command!");
+
+  const fs = require("fs");
+  const path = require("path");
+
+  try {
+    const cacheDirs = [
+      path.join(__dirname, "trash_baileys"), // your session folder
+      path.join(__dirname, "temp"),
+      path.join(__dirname, "cache"),
+      path.join(__dirname, ".cache")
+    ];
+
+    let cleared = 0;
+
+    for (const dir of cacheDirs) {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+        cleared++;
+      }
+    }
+
+    // Delete leftover temporary files but skip JSONs
+    const files = fs.readdirSync(__dirname);
+    for (const file of files) {
+      if (
+        (file.endsWith(".tmp") || file.endsWith(".dat") || file.endsWith(".cache")) &&
+        !file.endsWith(".json")
+      ) {
+        fs.unlinkSync(path.join(__dirname, file));
+        cleared++;
+      }
+    }
+
+    await reply(`🧹 *Cache Cleared Successfully!*\n\n🗂️ Cleared: ${cleared} cache folders/files\n💾 JSON files kept safe ✅`);
+
+  } catch (err) {
+    console.error("ClearCache Error:", err);
+    await reply(`❌ Failed to clear cache.\n${err.message}`);
+  }
+
+  break;
+}
+// ================= RESTART =================
+case 'restart': {
+  if (!isOwner) return reply("❌ Owner-only command!");
+
+  try {
+    await reply("♻️ Restarting Trashcore bot...");
+
+    const { exec } = require("child_process");
+    const chalk = require("chalk");
+
+    // Detect if using Pterodactyl (by env variables)
+    const isPterodactyl = process.env.P_SERVER_LOCATION || process.env.P_SERVER_UUID;
+
+    if (isPterodactyl) {
+      console.log(chalk.cyanBright("🧩 Detected Pterodactyl environment. Exiting for auto-restart..."));
+      process.exit(0); // Pterodactyl will auto-restart
+    } else if (process.env.RENDER || process.env.HEROKU) {
+      console.log(chalk.cyanBright("🌐 Detected cloud environment. Exiting for auto-restart..."));
+      process.exit(0);
+    } else {
+      // Fallback to PM2 restart
+      exec("pm2 restart all", (err, stdout) => {
+        if (err) {
+          console.error(chalk.red(`❌ PM2 restart failed: ${err.message}`));
+          return reply("⚠️ Failed to restart using PM2. Try manual restart.");
+        } else {
+          console.log(chalk.green(`✅ PM2 restart successful:\n${stdout}`));
+        }
+      });
+    }
+
+  } catch (err) {
+    console.error("Restart Command Error:", err);
+    await reply(`❌ Error restarting bot:\n${err.message}`);
+  }
+  break;
+}
+            // ================= CAT =================
+case 'cat': {
+  try {
+if (!isOwner) return reply('❌ Only the bot owner can use this command.');
+    if (!text) return reply('📘 Usage: cat <filename>\n\nExample: cat package.json');
+    
+    const filePath = path.resolve(text.trim());
+
+    // check if file exists
+    if (!fs.existsSync(filePath)) {
+      return reply(`❌ File not found: ${text}`);
+    }
+
+    // read file contents
+    const data = fs.readFileSync(filePath, 'utf8');
+
+    // prevent sending overly large files
+    if (data.length > 4096) {
+      // if too large, send as a document
+      await trashcore.sendMessage(from, {
+        document: fs.readFileSync(filePath),
+        fileName: path.basename(filePath),
+        mimetype: 'text/plain'
+      }, { quoted: m });
+    } else {
+      // otherwise send as text
+      await trashcore.sendMessage(from, { text: `📄 *${path.basename(filePath)}:*\n\n${data}` }, { quoted: m });
+    }
+
+  } catch (err) {
+    console.error('cat command error:', err);
+    reply(`💥 Error reading file: ${err.message}`);
+  }
+  break;
+}
             // ================= REPO =================
 case 'repo': {
     const axios = require('axios');
@@ -391,6 +818,7 @@ case 'repo': {
                 }
                 break;
             }
+          
             
 // =================MEDIAFIRE=================
 case 'mediafire': {
@@ -745,17 +1173,40 @@ case 'gitstalk': {
 case 'checksettings': {
   try {
     const fs = require('fs');
+    const os = require('os');
     const settingsPath = './library/settings.json';
+    const menuSettingsPath = './menuSettings.json';
+    const prefixSettingsPath = './library/prefixSettings.json';
 
-    if (!fs.existsSync(settingsPath)) {
-      return reply('⚠️ settings.json not found!');
-    }
+    // Ensure files exist
+    if (!fs.existsSync(settingsPath)) return reply('⚠️ settings.json not found!');
+    if (!fs.existsSync(menuSettingsPath)) fs.writeFileSync(menuSettingsPath, JSON.stringify({ mode: 'text', image: '', video: '' }, null, 2));
+    if (!fs.existsSync(prefixSettingsPath)) fs.writeFileSync(prefixSettingsPath, JSON.stringify({ prefix: '.' }, null, 2));
 
-    const settings = JSON.parse(fs.readFileSync(settingsPath));
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const menuSettings = JSON.parse(fs.readFileSync(menuSettingsPath, 'utf8'));
+    const prefixSettings = JSON.parse(fs.readFileSync(prefixSettingsPath, 'utf8'));
 
-    // Count how many groups have each feature enabled
-    const countEnabled = (obj) =>
-      Object.values(obj).filter((v) => v.enabled).length;
+    // Count enabled anti features
+    const countEnabled = (obj) => Object.values(obj).filter((v) => v.enabled).length;
+
+    // Detect host/platform
+    const detectPlatform = () => {
+      if (process.env.DYNO) return "Heroku";
+      if (process.env.RENDER) return "Render";
+      if (process.env.PREFIX && process.env.PREFIX.includes("termux")) return "Termux";
+      if (process.env.PORTS && process.env.CYPHERX_HOST_ID) return "CypherX Platform";
+      if (process.env.P_SERVER_UUID) return "Panel";
+      if (process.env.LXC) return "Linux Container (LXC)";
+      switch (os.platform()) {
+        case "win32": return "Windows";
+        case "darwin": return "macOS";
+        case "linux": return "Linux";
+        default: return "Unknown";
+      }
+    };
+
+    const hostPlatform = detectPlatform();
 
     const summary = `
 📋 *BOT SETTINGS STATUS* ⚙️
@@ -772,8 +1223,16 @@ case 'checksettings': {
 • Autotyping: ${settings.autotyping?.enabled ? '✅ ON' : '❎ OFF'}
 • Autorecord: ${settings.autorecord?.enabled ? '✅ ON' : '❎ OFF'}
 
-📦 *Settings File:*
-\`settings.json\`
+🎨 *Menu Settings:*
+• Mode: ${menuSettings.mode || 'text'}
+${menuSettings.mode === 'image' ? `• Image URL: ${menuSettings.image || 'Not set'}` : ''}
+${menuSettings.mode === 'video' ? `• Video URL: ${menuSettings.video || 'Not set'}` : ''}
+
+🔧 *Bot Info:*
+• Prefix: ${prefixSettings.prefix || '.'}
+• Host/Platform: ${hostPlatform}
+
+📦 *Settings File:* \`settings.json\`
 Last updated: ${new Date().toLocaleString()}
 `;
 
@@ -1067,6 +1526,8 @@ case 'video': {
                 break;
             }
 // ================= GET CASE  =================
+
+// ================= GET CASE  =================
 case 'getcase': {
 if (!isOwner) return reply("❌ This command is for owner-only.");
   try {
@@ -1106,6 +1567,229 @@ if (!isOwner) return reply("❌ This command is for owner-only.");
   } catch (err) {
     console.error('Getcase Command Error:', err);
     await reply(`❌ Failed to get case.\n${err.message}`);
+  }
+  break;
+}
+
+case 'uploadfile': {
+  try {
+    // Get the document
+    const docMsg = m.message?.documentMessage 
+                || m.message?.extendedTextMessage?.contextInfo?.quotedMessage?.documentMessage;
+
+    if (!docMsg) return reply("⚠️ Please reply to a document file (.js or .json).");
+
+    const fileName = docMsg.fileName || '';
+    if (!fileName.endsWith('.js') && !fileName.endsWith('.json')) {
+      return reply("⚠️ Only .js or .json files are allowed!");
+    }
+
+    // Attempt to download, catch decryption errors
+    let buffer;
+    try {
+      buffer = await trashcore.downloadMediaMessage(docMsg);
+    } catch (downloadErr) {
+      console.error("Download failed:", downloadErr);
+      return reply("❌ Failed to download the document. Make sure it's a valid file.");
+    }
+
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    const filePath = path.join(uploadDir, fileName);
+    fs.writeFileSync(filePath, buffer);
+
+    await reply(`✅ File uploaded successfully!\nPath: ${filePath}`);
+  } catch (err) {
+    console.error("UploadFile Command Error:", err);
+    await reply(`❌ Failed to upload file.\nError: ${err.message}`);
+  }
+  break;
+}
+// ================= ADD CASE  =================
+case 'addcase': {
+  if (!isOwner) return reply("❌ Owner-only command.");
+  
+  try {
+    const fs = require('fs');
+    const path = require('path');
+
+    const cmdName = args[0]?.toLowerCase();
+    const q = text.split(' ').slice(1).join(' '); // ✅ define q manually
+    const code = q.replace(cmdName, '').trim(); // remove command name from rest
+
+    if (!cmdName) return reply('⚠️ Usage: .addcase <command> <code>');
+    if (!code) return reply('⚠️ Please provide the JavaScript code for this command.');
+
+    const commandsFile = path.join(__dirname, 'case.js');
+    if (!fs.existsSync(commandsFile)) return reply('❌ Commands file not found.');
+
+    let content = fs.readFileSync(commandsFile, 'utf8');
+
+    // Prevent duplicate
+    if (content.includes(`case '${cmdName}':`)) {
+      return reply(`⚠️ A case named '${cmdName}' already exists.`);
+    }
+
+    // Insert before final 'default:' or last '}'
+    const insertRegex = /(?=default:|}\s*$)/i;
+    const newCase = `\ncase '${cmdName}': {\n${code}\n  break;\n}\n`;
+
+    if (!insertRegex.test(content)) {
+      return reply('❌ Could not find insertion point in file.');
+    }
+
+    const updated = content.replace(insertRegex, newCase + '\n$&');
+    fs.writeFileSync(commandsFile, updated);
+
+    await reply(`✅ Added new case '${cmdName}' successfully!`);
+
+  } catch (err) {
+    console.error('Addcase Command Error:', err);
+    await reply(`❌ Failed to add case.\n${err.message}`);
+  }
+  break;
+}
+// ================= ADD FILE  =================
+case 'addfile': {
+  if (!isOwner) return reply("❌ Owner-only command.");
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+
+    const fileName = args[0];
+    const code = q.replace(fileName, '').trim(); // remove the filename from message
+
+    if (!fileName) return reply("⚠️ Usage: .addfile <path/to/file> <code>");
+    if (!code) return reply("⚠️ Please provide file content.");
+
+    const baseDir = __dirname; // base folder of bot
+    const filePath = path.resolve(baseDir, fileName);
+
+    // Prevent directory escape (security)
+    if (!filePath.startsWith(baseDir)) {
+      return reply("🚫 Access denied: cannot write outside bot directory.");
+    }
+
+    // Ensure folder exists
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+
+    // Write or overwrite the file
+    await fs.promises.writeFile(filePath, code, 'utf8');
+
+    await reply(`✅ File *${fileName}* created/updated successfully!`);
+
+  } catch (err) {
+    console.error('AddFile Command Error:', err);
+    await reply(`❌ Failed to create file.\n${err.message}`);
+  }
+  break;
+}
+// ================= DEL CASE  =================
+case 'delcase': {
+  if (!isOwner) return reply("❌ Owner-only command.");
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+
+    const cmdName = args[0]?.toLowerCase();
+    if (!cmdName) return reply('⚠️ Usage: .delcase <command>');
+
+    const commandsFile = path.join(__dirname, 'case.js'); // adjust path
+    if (!fs.existsSync(commandsFile)) return reply('❌ Commands file not found.');
+
+    let content = fs.readFileSync(commandsFile, 'utf8');
+
+    // Regex to match the entire case block (case 'name': { ... break; })
+    const regex = new RegExp(`case ['"\`]${cmdName}['"\`]:[\\s\\S]*?break;\\s*}`, 'i');
+
+    if (!regex.test(content)) {
+      return reply(`❌ Could not find a case named '${cmdName}' in file.`);
+    }
+
+    // Remove the case block
+    const updated = content.replace(regex, '');
+    fs.writeFileSync(commandsFile, updated);
+
+    await reply(`✅ Successfully deleted case '${cmdName}'!`);
+
+  } catch (err) {
+    console.error('Delcase Command Error:', err);
+    await reply(`❌ Failed to delete case.\n${err.message}`);
+  }
+
+  break;
+}
+// ================= DEL FILE  =================
+case 'delfile': {
+  if (!isOwner) return reply("❌ Owner-only command.");
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+
+    const filePathArg = args[0];
+    if (!filePathArg) return reply("⚠️ Usage: .delfile <relative_path>\nExample: .delfile case.js");
+
+    // Resolve safe absolute path (prevent deleting system files)
+    const targetPath = path.join(__dirname, filePathArg);
+
+    if (!fs.existsSync(targetPath)) {
+      return reply(`❌ File or folder not found:\n${filePathArg}`);
+    }
+
+    const stats = fs.statSync(targetPath);
+    if (stats.isDirectory()) {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+      await reply(`🗂️ Folder *${filePathArg}* deleted successfully.`);
+    } else {
+      fs.unlinkSync(targetPath);
+      await reply(`🗑️ File *${filePathArg}* deleted successfully.`);
+    }
+
+  } catch (err) {
+    console.error("Delfile Command Error:", err);
+    await reply(`❌ Failed to delete file.\n${err.message}`);
+  }
+  break;
+}
+// ================= GET FILE  =================
+case 'getfile': {
+  if (!isOwner) return reply("❌ Owner-only command.");
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+
+    const fileName = args.join(" "); // allow subpaths like "library/utils.js"
+    if (!fileName) return reply("⚠️ Usage: .getfile <path/to/file>");
+
+    // Base directory (restrict access to your bot root)
+    const baseDir = __dirname;
+
+    // Resolve full path securely
+    const filePath = path.resolve(baseDir, fileName);
+
+    // Prevent access outside base directory
+    if (!filePath.startsWith(baseDir)) {
+      return reply("🚫 Access denied: outside bot directory.");
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return reply(`❌ File not found:\n${fileName}`);
+    }
+
+    await trashcore.sendMessage(from, {
+      document: fs.readFileSync(filePath),
+      mimetype: 'application/octet-stream',
+      fileName: path.basename(filePath)
+    }, { quoted: m });
+
+    await reply(`✅ Sent file: ${fileName}`);
+  } catch (err) {
+    console.error('GetFile Command Error:', err);
+    await reply(`❌ Failed to get file.\n${err.message}`);
   }
   break;
 }

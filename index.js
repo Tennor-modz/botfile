@@ -245,23 +245,39 @@ trashcore.ev.on('group-participants.update', async (update) => {
   }
 });
     // Pass to command handler
-    const from = m.key.remoteJid;
-    const sender = m.key.participant || from;
-    const isGroup = from.endsWith('@g.us');
-    const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
+const prefixSettingsPath = './library/prefixSettings.json';
 
-    let body =
-      m.message.conversation ||
-      m.message.extendedTextMessage?.text ||
-      m.message.imageMessage?.caption ||
-      m.message.videoMessage?.caption ||
-      m.message.documentMessage?.caption || '';
-    body = body.trim();
-    if (!body) return;
+// Load prefix dynamically
+let prefixSettings = fs.existsSync(prefixSettingsPath)
+  ? JSON.parse(fs.readFileSync(prefixSettingsPath, 'utf8'))
+  : { prefix: '.', defaultPrefix: '.' };
 
-    const args = body.split(/ +/);
-    const command = args.shift().toLowerCase();
+let prefix = prefixSettings.prefix || ''; // fallback to '' if no prefix
 
+const from = m.key.remoteJid;
+const sender = m.key.participant || from;
+const isGroup = from.endsWith('@g.us');
+const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
+
+// Extract message body
+let body =
+  m.message.conversation ||
+  m.message.extendedTextMessage?.text ||
+  m.message.imageMessage?.caption ||
+  m.message.videoMessage?.caption ||
+  m.message.documentMessage?.caption || '';
+body = body.trim();
+if (!body) return;
+
+// Skip if prefix is required and message doesn't start with it
+if (prefix !== '' && !body.startsWith(prefix)) return;
+
+// Remove prefix if present
+const bodyWithoutPrefix = prefix === '' ? body : body.slice(prefix.length);
+
+// Split command and arguments
+const args = bodyWithoutPrefix.trim().split(/ +/);
+const command = args.shift().toLowerCase();
     const groupMeta = isGroup ? await trashcore.groupMetadata(from).catch(() => null) : null;
     const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
     const isAdmin = isGroup ? groupAdmins.includes(sender) : false;

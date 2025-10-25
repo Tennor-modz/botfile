@@ -321,6 +321,7 @@ case 'help': {
 • setmenuimage
 • setmenuvideo
 • setprefix
+• menu2
 
 🥁 ANALYSIS 
 • weather 
@@ -337,9 +338,11 @@ case 'help': {
 🛟 MEDIA
 • tiktok
 • play
+• song 
 • igdl
 • fb
 • video 
+• ytmp3 
 • playdoc
 • mediafire 
 
@@ -362,6 +365,11 @@ case 'help': {
 • toaudio 
 • tovoicenote 
 • toimage
+• fast
+• slow
+• bass
+• deep
+• fancy
 
 🤠 DEVELOPER 
 • addcase
@@ -969,43 +977,143 @@ case 'setdp': {
   }
   break;
 }
-// ================= CHATGPT=================
-case 'claude-al': {
+// ================= SOUNDS =================
+case 'slow':
+case 'fast':
+case 'deep':
+case 'bass': {
   try {
-    const question = args.join(' ');
-    if (!question) return reply('❌ Please provide a question. Usage: . claude-al <your question>');
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const ffmpeg = require('fluent-ffmpeg');
+    const fs = require('fs');
+    const { tmpdir } = require('os');
+    const path = require('path');
 
-    await reply('💭 Asking Claude, please wait...');
+    // ✅ Get the quoted media
+    const contextInfo = m.message?.extendedTextMessage?.contextInfo;
+    const quotedMsg = m.quoted || contextInfo?.quotedMessage;
+    if (!quotedMsg) return reply("⚠️ Please reply to an *audio message* or *voice note*.");
 
-    const fetch = require('node-fetch');
-    const apiUrl = `https://savant-api.vercel.app/ai/claude?question=${encodeURIComponent(question)}`;
+    const msgType = Object.keys(quotedMsg)[0];
+    const msg = quotedMsg[msgType];
 
-    const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    // Accept audio or voice notes
+    const mime = msg.mimetype || '';
+    if (!/audio/.test(mime)) return reply("⚠️ The replied message is not an *audio* or *voice note*.");
 
-    // Try to parse JSON; fallback to text
-    let data;
-    try {
-      data = await res.json();
-    } catch {
-      const text = await res.text();
-      data = { answer: text };
+    reply("⏳ Processing audio...");
+
+    // ✅ Download media
+    const stream = await downloadContentFromMessage(msg, 'audio');
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    // ✅ Temp paths
+    const inputPath = path.join(tmpdir(), `input_${Date.now()}.mp3`);
+    const outputPath = path.join(tmpdir(), `output_${Date.now()}.mp3`);
+    fs.writeFileSync(inputPath, buffer);
+
+    // ✅ Apply audio filters
+    let ffmpegArgs = '';
+    switch (command) {
+      case 'slow': ffmpegArgs = 'atempo=0.7'; break;
+      case 'fast': ffmpegArgs = 'atempo=1.5'; break;
+      case 'deep': ffmpegArgs = 'asetrate=44100*0.8,aresample=44100'; break;
+      case 'bass': ffmpegArgs = 'bass=g=10'; break;
     }
 
-    console.log('Claude API response:', data);
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .audioFilters(ffmpegArgs)
+        .toFormat('mp3')
+        .on('end', resolve)
+        .on('error', reject)
+        .save(outputPath);
+    });
 
-    const answer =
-      data.answer ||
-      data.response ||
-      data.result ||
-      data.output ||
-      data.text ||
-      "⚠️ No valid response received from API.";
+    // ✅ Send processed audio
+    const audioBuffer = fs.readFileSync(outputPath);
+    await trashcore.sendMessage(m.chat, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: m });
 
-    await reply(`🤖 *Claude AI Response:*\n\n${answer}`);
+    // ✅ Cleanup
+    fs.unlinkSync(inputPath);
+    fs.unlinkSync(outputPath);
+
   } catch (err) {
-    console.error('ChatGPT Command Error:', err);
-    await reply(`❌ Failed to fetch response from Claude API.\nError: ${err.message}`);
+    console.error("❌ Audio processing error:", err);
+    reply("❌ Failed to process audio. Ensure it's a valid audio or voice note.");
+  }
+  break;
+}
+
+case 'convertphoto': {
+  try {
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+    const axios = require('axios');
+    const FormData = require('form-data');
+
+    const contextInfo = m.message?.extendedTextMessage?.contextInfo;
+    const quotedMsg = m.quoted || contextInfo?.quotedMessage;
+    if (!quotedMsg) return reply("⚠️ Please reply to an *image*.");
+
+    const msgType = Object.keys(quotedMsg)[0];
+    const msg = quotedMsg[msgType];
+
+    if (!msg || !msg.mimetype?.includes('image')) {
+      return reply("⚠️ The replied message is not a valid *image*.");
+    }
+
+    const args = m.text?.split(' ').slice(1);
+    const template = args?.[0] || 'anime';
+    const style = args?.[1] || '3d';
+
+    reply(`⏳ Processing image with template: *${template}* and style: *${style}*...`);
+
+    // Download the image
+    const stream = await downloadContentFromMessage(msg, 'image');
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    const inputPath = path.join(tmpdir(), `input_${Date.now()}.jpg`);
+    fs.writeFileSync(inputPath, buffer);
+
+    const form = new FormData();
+    form.append('image', fs.createReadStream(inputPath));
+    form.append('template', template);
+    form.append('style', style);
+
+    let data;
+    try {
+      const response = await axios.post('https://api.zenzxz.my.id/api/ai/convertphoto', form, {
+        headers: form.getHeaders(),
+        timeout: 20000
+      });
+      data = response.data;
+    } catch (apiErr) {
+      console.error("API request failed:", apiErr.response?.data || apiErr.message);
+      return reply("❌ API request failed. Try again later.");
+    }
+
+    if (!data?.result) {
+      console.log("API returned invalid response:", data);
+      return reply("❌ Failed to process image from API. Check your template/style or try a different image.");
+    }
+
+    const imageResp = await axios.get(data.result, { responseType: 'arraybuffer' });
+    const outputPath = path.join(tmpdir(), `output_${Date.now()}.jpg`);
+    fs.writeFileSync(outputPath, imageResp.data);
+
+    await trashcore.sendMessage(from, { image: fs.readFileSync(outputPath), caption: "✅ Here’s your converted photo!" }, { quoted: m });
+
+    fs.unlinkSync(inputPath);
+    fs.unlinkSync(outputPath);
+
+  } catch (err) {
+    console.error("❌ convertphoto error:", err);
+    reply("❌ Failed to process image. Ensure you replied to a valid image.");
   }
   break;
 }
@@ -1475,6 +1583,312 @@ case 'video': {
     } catch (error) {
         console.error('[VIDEO] Command Error:', error?.message || error);
         reply('❌ Download failed: ' + (error?.message || 'Unknown error'));
+    }
+    break;
+}
+
+case 'menu2':
+case 'help2': {
+  const { generateWAMessageContent, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+
+  try {
+    const categories = [
+      {
+        title: "📊 SYSTEM",
+        desc: `• ping
+• public 
+• private 
+• autoread 
+• autorecord 
+• autotyping 
+• checksettings 
+• setdp
+• setmenu
+• setmenuimage
+• setmenuvideo
+• setprefix`,
+        button: { text: "𝐓𝐑𝐀𝐒𝐇", url: "https://youtube.com/@giddytennor?si=7pf4DxuDSI142BEW" },
+        image: "https://url.bwmxmd.online/Adams.tnn0fm6w.jpg"
+      },
+      {
+        title: "🥁 ANALYSIS",
+        desc: `• weather 
+• checktime 
+• gitclone 
+• repo
+• fact
+• claude-al
+• gitstalk
+• ssweb
+• whois
+• scan`,
+        button: { text: "𝐓𝐑𝐀𝐒𝐇", url: "https://youtube.com/@giddytennor?si=7pf4DxuDSI142BEW" },
+        image: "https://url.bwmxmd.online/Adams.tnn0fm6w.jpg"
+      },
+      {
+        title: "🛟 MEDIA",
+        desc: `• tiktok
+• play
+• song 
+• igdl
+• fb
+• video 
+• ytmp3 
+• playdoc
+• mediafire`,
+        button: { text: "𝐓𝐑𝐀𝐒𝐇", url: "https://youtube.com/@giddytennor?si=7pf4DxuDSI142BEW" },
+        image: "https://url.bwmxmd.online/Adams.tnn0fm6w.jpg"
+      },
+      {
+        title: "👥 GROUP",
+        desc: `• add
+• kick
+• promote 
+• demote
+• antilink
+• antitag
+• antipromote 
+• antidemote 
+• antibadword 
+• tagall
+• hidetag
+• mute
+• unmute`,
+        button: { text: "𝐓𝐑𝐀𝐒𝐇", url: "https://youtube.com/@giddytennor?si=7pf4DxuDSI142BEW" },
+        image: "https://url.bwmxmd.online/Adams.tnn0fm6w.jpg"
+      },
+      {
+        title: "📍 CONVERSION",
+        desc: `• toaudio 
+• tovoicenote 
+• toimage`,
+        button: { text: "𝐓𝐑𝐀𝐒𝐇", url: "https://youtube.com/@giddytennor?si=7pf4DxuDSI142BEW" },
+        image: "https://url.bwmxmd.online/Adams.tnn0fm6w.jpg"
+      },
+      {
+        title: "🤠 DEVELOPER",
+        desc: `• addcase
+• addfile
+• delcase
+• delfile
+• restart`,
+        button: { text: "𝐓𝐑𝐀𝐒𝐇", url: "https://youtube.com/@giddytennor?si=7pf4DxuDSI142BEW" },
+        image: "https://url.bwmxmd.online/Adams.tnn0fm6w.jpg"
+      },
+      {
+        title: "👤 BASIC",
+        desc: `• copilot
+• cat
+• getcase 
+• ls
+• >
+• <
+• =>`,
+        button: { text: "𝐓𝐑𝐀𝐒𝐇", url: "https://youtube.com/@giddytennor?si=7pf4DxuDSI142BEW" },
+        image: "https://url.bwmxmd.online/Adams.tnn0fm6w.jpg"
+      }
+    ];
+
+    // 🧩 Generate carousel cards with CTA buttons
+    const carouselCards = await Promise.all(
+      categories.map(async (item, index) => {
+        const imageMsg = (
+          await generateWAMessageContent(
+            { image: { url: item.image } },
+            { upload: trashcore.waUploadToServer }
+          )
+        ).imageMessage;
+
+        return {
+          header: {
+            title: item.title,
+            hasMediaAttachment: true,
+            imageMessage: imageMsg
+          },
+          body: { text: item.desc },
+          footer: { text: `📖 Page ${index + 1} of ${categories.length}` },
+          nativeFlowMessage: {
+            buttons: [
+              {
+                name: "cta_url",
+                buttonParamsJson: JSON.stringify({
+                  display_text: item.button.text,
+                  url: item.button.url,
+                  merchant_url: item.button.url
+                })
+              }
+            ]
+          }
+        };
+      })
+    );
+
+    // 🧱 Build the carousel message
+    const carouselMessage = generateWAMessageFromContent(
+      from,
+      {
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            interactiveMessage: {
+              body: { text: "✨ *TRASHCORE MAIN MENU* ⚡" },
+              footer: { text: "Swipe ⬅️➡️ to explore all commands" },
+              carouselMessage: { cards: carouselCards }
+            }
+          }
+        }
+      },
+      { quoted: m }
+    );
+
+    // 🚀 Send carousel
+    await trashcore.relayMessage(from, carouselMessage.message, {
+      messageId: carouselMessage.key.id
+    });
+
+  } catch (error) {
+    console.error("❌ Menu command error:", error);
+    await reply("⚠️ Failed to load menu. Please try again later.");
+  }
+  break;
+}
+// ================= SONG =================
+case 'song':
+case 'playmusic': {
+const axios = require('axios');
+const fs = require('fs');
+const ffmpeg = require('fluent-ffmpeg');
+const path = require('path');
+    async function getBuffer(url) {
+        try {
+            const res = await axios.get(url, { responseType: 'arraybuffer' });
+            return Buffer.from(res.data, 'binary');
+        } catch (err) {
+            console.error('Error fetching buffer:', err);
+            throw err;
+        }
+    }
+
+    if (!q) return reply("please provide a song name!");
+
+    try {
+        const apiUrl = `https://savant-api.vercel.app/download/play?query=${encodeURIComponent(q)}`;
+        const response = await axios.get(apiUrl);
+        const result = response.data?.result;
+
+        if (!result) return reply("❌ Could not find the song.");
+
+        const { title, author, duration, thumbnail, download } = result;
+
+        if (!download) return reply("❌ Audio link not available. Try another song.");
+
+        // Fetch thumbnail
+        const thumbBuffer = await getBuffer(thumbnail);
+
+        const captionText = `
+🎵 *Now Playing - MP3*
+
+🔶 Title: ${title}
+🔶 Artist: ${author}
+🔶 Duration: ${duration}
+        `;
+
+        // Send thumbnail first
+        await trashcore.sendMessage(m.chat, {
+            image: { url: thumbnail },
+            caption: captionText
+        }, { quoted: m });
+
+        // Download original audio temporarily
+        const tempAudioPath = path.join(__dirname, `${title}.mp3`);
+        const audioRes = await axios.get(download, { responseType: 'arraybuffer' });
+        fs.writeFileSync(tempAudioPath, audioRes.data);
+
+        // Convert audio to lower bitrate (e.g., 64kbps)
+        const lowAudioPath = path.join(__dirname, `${title}_low.mp3`);
+        await new Promise((resolve, reject) => {
+            ffmpeg(tempAudioPath)
+                .audioBitrate(64)
+                .save(lowAudioPath)
+                .on('end', resolve)
+                .on('error', reject);
+        });
+
+        // Send the smaller audio
+        await trashcore.sendMessage(m.chat, {
+            audio: { url: lowAudioPath },
+            mimetype: 'audio/mpeg',
+            fileName: `${title}.mp3`
+        }, { quoted: m });
+
+        // Cleanup temporary files
+        fs.unlinkSync(tempAudioPath);
+        fs.unlinkSync(lowAudioPath);
+
+    } catch (err) {
+        console.error(err);
+        reply("❌ Failed to fetch or process the audio.");
+    }
+    break;
+}
+// ================= YTMP3 =================
+case 'ytmp3':
+case 'ytaudio': {
+const axios = require('axios');
+
+async function getBuffer(url) {
+    try {
+        const res = await axios.get(url, { responseType: 'arraybuffer' });
+        return Buffer.from(res.data, 'binary');
+    } catch (err) {
+        console.error('Error fetching buffer:', err);
+        throw err;
+    }
+}
+    if (!q) return reply("please provide a youtube link!");
+
+    try {
+        const apiUrl = `https://savant-api.vercel.app/download/play?query=${encodeURIComponent(q)}`;
+        const response = await axios.get(apiUrl);
+        const result = response.data?.result;
+
+        if (!result) return reply("❌ Could not find the song.");
+
+        const { title, author, duration, thumbnail, url, download } = result;
+
+        if (!download) return reply("❌ Audio link not available. Try another song.");
+
+        // Get thumbnail buffer
+        const thumbBuffer = await getBuffer(thumbnail);
+
+        const captionText = `
+🎵 *Now Playing - MP3*
+
+🔶 Title: ${title}
+🔶 Artist: ${author}
+🔶 Duration: ${duration}
+🔶 URL: ${url}
+        `;
+
+        // Send message with thumbnail and info
+        await trashcore.sendMessage(m.chat, {
+            image: { url: thumbnail },
+            caption: captionText
+        }, { quoted: m });
+
+        // Send audio
+        await trashcore.sendMessage(m.chat, {
+            audio: { url: download },
+            mimetype: 'audio/mpeg',
+            fileName: `${title}.mp3`
+        }, { quoted: m });
+
+    } catch (err) {
+        console.error(err);
+        reply("❌ Failed to fetch the audio from the API.");
     }
     break;
 }
@@ -2045,7 +2459,7 @@ const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     if (!isGroup) return reply("⚠️ This command only works in groups!");
      if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
-     if (!isOwner) return reply("⚠️ Only the bot owner can toggle autorecord!");
+     if (!isOwner) return reply("⚠️ Only the bot owner can toggle antilink!");
     const option = args[0]?.toLowerCase();
     const mode = args[1]?.toLowerCase() || "delete";
 
@@ -2729,52 +3143,97 @@ case 'copilot': {
     break;
 }
 
+// =================FANCY =================
+case 'fancy': {
+    try {
+        if (!args[0]) return reply('⚠️ Please provide a text!\n\nExample:\n.fancy Hello World');
+
+        const text = args.join(' ');
+
+        // 30 distinct fancy style functions
+        const styles = [
+            (t) => t.toUpperCase(),
+            (t) => t.toLowerCase(),
+            (t) => t.split('').reverse().join(''),                              // reversed
+            (t) => t.split('').map(c => c + '̶').join(''),                      // strikethrough
+            (t) => t.split('').map(c => `*${c}*`).join(''),                     // pseudo-bold
+            (t) => t.split('').map(c => `~${c}~`).join(''),                     // wave
+            (t) => t.split('').map(c => '•'+c+'•').join(''),                    // dotted
+            (t) => t.split('').map(c => c + '̄').join(''),                      // macron
+            (t) => t.split('').map(c => c + '̣').join(''),                      // dot below
+            (t) => t.split('').map(c => c + '̃').join(''),                      // tilde above
+            (t) => t.split('').map(c => c + '́').join(''),                      // acute accent
+            (t) => t.split('').map(c => c + '̀').join(''),                      // grave accent
+            (t) => t.split('').map(c => c + '̈').join(''),                      // diaeresis
+            (t) => t.split('').map(c => c + '̌').join(''),                      // caron
+            (t) => t.split('').map(c => c + '̇').join(''),                      // dot above
+            (t) => t.split('').map(c => c + '̓').join(''),                      // reversed comma above
+            (t) => t.split('').map(c => c + '̔').join(''),                      // reversed apostrophe
+            (t) => t.split('').map(c => c + '̛').join(''),                      // hook above
+            (t) => t.split('').map(c => c + '͌').join(''),                      // tilde overlay
+            (t) => t.split('').map(c => c + '͐').join(''),                      // inverted breve
+            (t) => t.split('').map(c => c + '͂').join(''),                      // circumflex
+            (t) => t.split('').map(c => c + '̋').join(''),                      // double acute
+            (t) => t.split('').map(c => c + '̏').join(''),                      // inverted double acute
+            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D400 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // bold unicode
+            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D434 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // italic
+            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D49C + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // script
+            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D504 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // fraktur
+            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D538 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // double-struck
+            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x24B6 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // circled
+        ];
+
+        // generate 30 unique styles
+        const results = styles.map((styleFn, index) => `${index + 1}. ${styleFn(text)}`);
+
+        await reply(results.join('\n\n'));
+
+    } catch (err) {
+        console.error("Fancy command error:", err);
+        await reply(`❌ Error: ${err.message}`);
+    }
+    break;
+}
             // =================EPHOTO =================
 case 'ephoto': {
   try {
-    const FormData = require('form-data');
     const axios = require('axios');
-    const cheerio = require('cheerio');
 
-    // 1️⃣ Check arguments
     const effect = args[0]?.toLowerCase();
     const text = args.slice(1).join(' ');
     if (!effect || !text) return reply(
       "⚠️ Usage: .ephoto <effect> <text>\n" +
-      "📌 Available effects: silver, gold, neon, shadow, glitch"
+      "📌 Example: .ephoto comic CASPER"
     );
 
-    // 2️⃣ Map effects to Ephoto endpoints
     const effectMap = {
-      silver: "https://ephoto360.com/effect/silver-text-effect.html",
-      gold: "https://ephoto360.com/effect/gold-text-effect.html",
-      neon: "https://ephoto360.com/effect/neon-text-effect.html",
-      shadow: "https://ephoto360.com/effect/shadow-text-effect.html",
-      glitch: "https://ephoto360.com/effect/glitch-text-effect.html"
+      comic: "https://casper-tech-apis.vercel.app/api/ephoto-360/comic",
+      silver: "https://casper-tech-apis.vercel.app/api/ephoto-360/silver",
+      gold: "https://casper-tech-apis.vercel.app/api/ephoto-360/gold",
+      neon: "https://casper-tech-apis.vercel.app/api/ephoto-360/neon",
+      shadow: "https://casper-tech-apis.vercel.app/api/ephoto-360/shadow",
+      glitch: "https://casper-tech-apis.vercel.app/api/ephoto-360/glitch"
     };
 
-    const url = effectMap[effect];
-    if (!url) return reply("⚠️ Invalid effect! Check the list with available effects.");
+    const apiUrl = effectMap[effect];
+    if (!apiUrl) return reply("⚠️ Invalid effect! Check the list with available effects.");
 
-    // 3️⃣ Create form data
-    const form = new FormData();
-    form.append('text[]', text);
+    // ✅ Call the Casper API
+    const response = await axios.get(`${apiUrl}?text=${encodeURIComponent(text)}`);
 
-    // 4️⃣ Send POST request
-    const { data } = await axios.post(url, form, {
-      headers: form.getHeaders()
+    if (!response.data?.success) return reply("❌ Failed to generate image from API.");
+
+    const imgUrl = response.data.imageUrl || response.data.downloadUrl;
+    if (!imgUrl) return reply("❌ No image returned by the API.");
+
+    // ✅ Send the generated image
+    await trashcore.sendMessage(from, {
+      image: { url: imgUrl },
+      caption: `✨ Ephoto (${effect}) result for: ${text}`
     });
 
-    // 5️⃣ Parse resulting HTML to get image URL
-    const $ = cheerio.load(data);
-    const imgUrl = $('img#main_image').attr('src');
-    if (!imgUrl) return reply("❌ Failed to generate image!");
-
-    // 6️⃣ Send the image to chat
-    await trashcore.sendMessage(from, { image: { url: imgUrl }, caption: `✨ Your Ephoto (${effect}) result for: ${text}` });
-
   } catch (err) {
-    console.error("💥 Ephoto command error:", err);
+    console.error("💥 Ephoto command error:", err.response?.data || err.message);
     reply("💥 Something went wrong while generating the Ephoto!");
   }
   break;

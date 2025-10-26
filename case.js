@@ -60,7 +60,7 @@ function jidDecode(jid) {
 }
 
 // =============== MAIN FUNCTION ===============
-module.exports = async function handleCommand(trashcore, m, command,groupAdmins,isBotAdmins,groupMeta,config) {
+module.exports = async function handleCommand(trashcore, m, command,groupAdmins,isBotAdmins,groupMeta,config,prefix) {
 
     // ======= Safe JID decoding =======
     trashcore.decodeJid = (jid) => {
@@ -93,19 +93,48 @@ const isOwner = senderJid === botNumber;
     const text = args.join(" ");
 
     const time = new Date().toLocaleTimeString();
-    
+   
 
-console.log(
-  chalk.bgHex('#8B4513').white.bold(`
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📥 INCOMING MESSAGE (${time})
-👤 From: ${pushname} (${participant})
-💬 Chat Type: ${chatType} - ${chatName}
-🏷️ Command: ${command || "—"}
-💭 Message: ${body || "—"}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`)
-);
+if (m.message) {
+  const date = new Date().toLocaleString();
+  const isGroupMsg = m.isGroup;
+  const body = m.body || m.messageStubType || "—";
+  const groupMetadata = m.isGroup ? await trashcore.groupMetadata(m.chat).catch(e => {}) : ''
+  const groupName = m.isGroup ? groupMetadata.subject : ''
+  const pushnameDisplay = pushname || "Unknown";
+  const command = body.startsWith(prefix) ? body.split(' ')[0] : null;
+
+  // 🌅 Time-based greeting
+  const hour = new Date().getHours();
+  const ucapanWaktu =
+    hour < 12
+      ? "Good Morning"
+      : hour < 18
+      ? "Good Afternoon"
+      : "Good Evening";
+
+  const headerColor = chalk.black.bold.bgHex('#ff5e78');  // Pink header
+  const subHeaderColor = chalk.white.bold.bgHex('#4a69bd'); // Blue header
+  const bodyColor = chalk.black.bgHex('#fdcb6e'); // Yellow box
+
+  console.log(headerColor(`\n🌟 ${ucapanWaktu} 🌟`));
+  console.log(
+    subHeaderColor(
+      `🚀 ${isGroupMsg ? "GROUP MESSAGE RECEIVED" : "PRIVATE MESSAGE RECEIVED"} 🚀`
+    )
+  );
+
+  let info = `
+📅 DATE: ${date}
+💬 MESSAGE: ${body}
+🗣️ SENDERNAME: ${pushnameDisplay}
+👤 JID: ${m.sender}
+${isGroupMsg ? `🏠 GROUP: ${groupName || "Unknown Group"}` : ""}
+${command ? `🏷️ COMMAND: ${command}` : ""}
+`;
+
+  console.log(bodyColor(info));
+}
 // --- 🚨 ANTILINK 2.0 AUTO CHECK ---
 if (isGroup && global.settings?.antilink?.[from]?.enabled) {
   const settings = global.settings.antilink[from];
@@ -360,6 +389,8 @@ case 'help': {
 • hidetag
 • mute
 • unmute
+• setwelcome 
+• setgoodbye 
 
 📍 CONVERSION
 • toaudio 
@@ -370,6 +401,7 @@ case 'help': {
 • bass
 • deep
 • fancy
+• sticker 
 
 🤠 DEVELOPER 
 • addcase
@@ -377,11 +409,14 @@ case 'help': {
 • delcase
 • delfile
 • restart 
+• getcase 
 
 👤 BASIC
 • copilot
 • cat
-• getcase 
+• vv
+• eval
+• exec
 • ls
 • >
 • <
@@ -517,6 +552,52 @@ case 'setmenuvideo': {
 
   await reply(`✅ Menu video updated successfully!\n🎞️ New Video: ${url}`);
   break;
+}
+
+// ================= VV =================
+case 'vv': {
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    try {
+        if (!m.quoted) return reply('⚠️ Please reply to a *view once* message!');
+        
+        const quotedMsg = m.quoted.message || m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!quotedMsg) return reply('❌ No quoted message found!');
+
+        const isImage = !!(quotedMsg?.imageMessage?.viewOnce || quotedMsg?.viewOnceMessage?.message?.imageMessage);
+        const isVideo = !!(quotedMsg?.videoMessage?.viewOnce || quotedMsg?.viewOnceMessage?.message?.videoMessage);
+
+        if (!isImage && !isVideo) return reply('⚠️ This is not a *view once* message!');
+
+        const mediaMessage = isImage 
+            ? quotedMsg.imageMessage || quotedMsg.viewOnceMessage?.message?.imageMessage 
+            : quotedMsg.videoMessage || quotedMsg.viewOnceMessage?.message?.videoMessage;
+
+        // ✅ Safe writable directory
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+        const tempFile = path.join(tempDir, `viewonce_${Date.now()}.${isImage ? 'jpg' : 'mp4'}`);
+        const stream = await downloadContentFromMessage(mediaMessage, isImage ? 'image' : 'video');
+
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+        fs.writeFileSync(tempFile, buffer);
+
+        const caption = mediaMessage.caption || '';
+        await trashcore.sendMessage(
+            m.chat,
+            isImage 
+                ? { image: buffer, caption: `*Retrieved by Trashcore*\n${caption}` }
+                : { video: buffer, caption: `*Retrieved by Trashcore*\n${caption}` },
+            { quoted: m }
+        );
+
+        fs.unlinkSync(tempFile); // cleanup
+    } catch (err) {
+        console.error('ViewOnce error:', err);
+        await reply(`❌ Failed to process view once message:\n${err?.message || err}`);
+    }
+    break;
 }
 // ================= PINTEREST =================
 case 'scan': {
@@ -1199,6 +1280,50 @@ case 'unmute': {
     }
     break;
 }
+// =================WELCOME=================
+case 'setwelcome': {
+  if (!m.isGroup) return reply('⚠️ This command can only be used in groups!');
+ const groupMetadata = m.isGroup ? await trashcore.groupMetadata(m.chat).catch(e => {}) : ''
+  const isAdmin = groupMetadata.participants.some(p => p.id === m.sender && p.admin);
+  if (!isAdmin && !isOwner) return reply('❌ Only group admins can enable or disable welcome messages!');
+
+  const fs = require('fs');
+  const path = './library/welcome.json';
+  let data = {};
+  if (fs.existsSync(path)) data = JSON.parse(fs.readFileSync(path));
+
+  const input = q ? q.toLowerCase() : '';
+  if (!['on', 'off'].includes(input))
+    return reply('📘 Usage:\n.setwelcome on — Enable welcome\n.setwelcome off — Disable welcome');
+
+  data[m.chat] = input === 'on';
+  fs.writeFileSync(path, JSON.stringify(data, null, 2));
+
+  reply(`✅ Welcome messages have been *${input === 'on' ? 'enabled' : 'disabled'}* for this group!`);
+  break;
+}
+// =================GOODBYE=================
+case 'setgoodbye': {
+  if (!m.isGroup) return reply('⚠️ This command can only be used in groups!');
+ const groupMetadata = m.isGroup ? await trashcore.groupMetadata(m.chat).catch(e => {}) : ''
+  const isAdmin = groupMetadata.participants.some(p => p.id === m.sender && p.admin);
+  if (!isAdmin && !isOwner) return reply('❌ Only group admins can enable or disable goodbye messages!');
+
+  const fs = require('fs');
+  const path = './library/goodbye.json';
+  let data = {};
+  if (fs.existsSync(path)) data = JSON.parse(fs.readFileSync(path));
+
+  const input = q ? q.toLowerCase() : '';
+  if (!['on', 'off'].includes(input))
+    return reply('📘 Usage:\n.setgoodbye on — Enable goodbye\n.setgoodbye off — Disable goodbye');
+
+  data[m.chat] = input === 'on';
+  fs.writeFileSync(path, JSON.stringify(data, null, 2));
+
+  reply(`✅ Goodbye messages have been *${input === 'on' ? 'enabled' : 'disabled'}* for this group!`);
+  break;
+}
 // =================SSWEB=================
 case 'ssweb': {
   try {
@@ -1282,21 +1407,34 @@ case 'checksettings': {
   try {
     const fs = require('fs');
     const os = require('os');
+
     const settingsPath = './library/settings.json';
     const menuSettingsPath = './menuSettings.json';
     const prefixSettingsPath = './library/prefixSettings.json';
+    const sSettingsPath = './library/s.json';
+    const welcomeSettingsPath = './library/welcome.json';
+    const goodbyeSettingsPath = './library/goodbye.json';
 
     // Ensure files exist
     if (!fs.existsSync(settingsPath)) return reply('⚠️ settings.json not found!');
     if (!fs.existsSync(menuSettingsPath)) fs.writeFileSync(menuSettingsPath, JSON.stringify({ mode: 'text', image: '', video: '' }, null, 2));
     if (!fs.existsSync(prefixSettingsPath)) fs.writeFileSync(prefixSettingsPath, JSON.stringify({ prefix: '.' }, null, 2));
+    if (!fs.existsSync(sSettingsPath)) fs.writeFileSync(sSettingsPath, JSON.stringify({}, null, 2));
+    if (!fs.existsSync(welcomeSettingsPath)) fs.writeFileSync(welcomeSettingsPath, JSON.stringify({}, null, 2));
+    if (!fs.existsSync(goodbyeSettingsPath)) fs.writeFileSync(goodbyeSettingsPath, JSON.stringify({}, null, 2));
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     const menuSettings = JSON.parse(fs.readFileSync(menuSettingsPath, 'utf8'));
     const prefixSettings = JSON.parse(fs.readFileSync(prefixSettingsPath, 'utf8'));
+    const sSettings = JSON.parse(fs.readFileSync(sSettingsPath, 'utf8'));
+    const welcomeSettings = JSON.parse(fs.readFileSync(welcomeSettingsPath, 'utf8'));
+    const goodbyeSettings = JSON.parse(fs.readFileSync(goodbyeSettingsPath, 'utf8'));
 
-    // Count enabled anti features
-    const countEnabled = (obj) => Object.values(obj).filter((v) => v.enabled).length;
+    // Count enabled features
+    const countEnabled = (obj) => Object.values(obj).filter(v => v.enabled).length;
+
+    // Count sticker, welcome, goodbye enabled groups
+    const countEnabledGroups = (obj) => Object.values(obj).filter(v => v.enabled).length;
 
     // Detect host/platform
     const detectPlatform = () => {
@@ -1336,11 +1474,18 @@ case 'checksettings': {
 ${menuSettings.mode === 'image' ? `• Image URL: ${menuSettings.image || 'Not set'}` : ''}
 ${menuSettings.mode === 'video' ? `• Video URL: ${menuSettings.video || 'Not set'}` : ''}
 
+💠 *Other Toggles:*
+• Stickers (s): ${countEnabledGroups(sSettings)} group(s)
+• Welcome: ${countEnabledGroups(welcomeSettings)} group(s)
+• Goodbye: ${countEnabledGroups(goodbyeSettings)} group(s)
+
 🔧 *Bot Info:*
 • Prefix: ${prefixSettings.prefix || '.'}
 • Host/Platform: ${hostPlatform}
 
-📦 *Settings File:* \`settings.json\`
+📦 *Settings Files:* 
+- settings.json, menuSettings.json, prefixSettings.json
+- s.json, welcome.json, goodbye.json
 Last updated: ${new Date().toLocaleString()}
 `;
 
@@ -1372,7 +1517,6 @@ Last updated: ${new Date().toLocaleString()}
                 }
                 break;
             }
-
 
 
             // ================= IG/FB DL =================
@@ -3194,49 +3338,160 @@ case 'fancy': {
     }
     break;
 }
-            // =================EPHOTO =================
-case 'ephoto': {
+
+
+case 'take': {
   try {
-    const axios = require('axios');
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+    const { writeExifImg, writeExifVid } = require('./library/exif'); 
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const stickerMsg = (quotedMsg && quotedMsg.stickerMessage) || m.message?.stickerMessage;
 
-    const effect = args[0]?.toLowerCase();
-    const text = args.slice(1).join(' ');
-    if (!effect || !text) return reply(
-      "⚠️ Usage: .ephoto <effect> <text>\n" +
-      "📌 Example: .ephoto comic CASPER"
-    );
+    if (!stickerMsg || !stickerMsg.mimetype?.includes('webp')) {
+      return reply(`⚠️ Reply to a *sticker* with caption:\n\n📦 *${command} packname|author*`);
+    }
+    const [packname, author] = text
+      ? text.split('|').map((s) => s.trim())
+      : [config.PACK_NAME || 'Trashcore Stickers', config.AUTHOR || 'Trashcore'];
 
-    const effectMap = {
-      comic: "https://casper-tech-apis.vercel.app/api/ephoto-360/comic",
-      silver: "https://casper-tech-apis.vercel.app/api/ephoto-360/silver",
-      gold: "https://casper-tech-apis.vercel.app/api/ephoto-360/gold",
-      neon: "https://casper-tech-apis.vercel.app/api/ephoto-360/neon",
-      shadow: "https://casper-tech-apis.vercel.app/api/ephoto-360/shadow",
-      glitch: "https://casper-tech-apis.vercel.app/api/ephoto-360/glitch"
-    };
+    reply('🪄 Taking ownership of sticker...');
 
-    const apiUrl = effectMap[effect];
-    if (!apiUrl) return reply("⚠️ Invalid effect! Check the list with available effects.");
-
-    // ✅ Call the Casper API
-    const response = await axios.get(`${apiUrl}?text=${encodeURIComponent(text)}`);
-
-    if (!response.data?.success) return reply("❌ Failed to generate image from API.");
-
-    const imgUrl = response.data.imageUrl || response.data.downloadUrl;
-    if (!imgUrl) return reply("❌ No image returned by the API.");
-
-    // ✅ Send the generated image
-    await trashcore.sendMessage(from, {
-      image: { url: imgUrl },
-      caption: `✨ Ephoto (${effect}) result for: ${text}`
+    // ✅ Download sticker buffer
+    const stream = await downloadContentFromMessage(stickerMsg, 'sticker');
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+    const webpPath = await writeExifImg(buffer, {
+      packname: packname || 'Trashcore Stickers',
+      author: author || 'Trashcore',
     });
+    const newSticker = fs.readFileSync(webpPath);
+    await trashcore.sendMessage(m.chat, { sticker: newSticker }, { quoted: m });
 
+    // ✅ Cleanup
+    fs.unlinkSync(webpPath);
+
+    reply(`✅ Sticker rebranded!\n\n📦 *Pack:* ${packname}\n👨‍🎨 *Author:* ${author}`);
   } catch (err) {
-    console.error("💥 Ephoto command error:", err.response?.data || err.message);
-    reply("💥 Something went wrong while generating the Ephoto!");
+    console.error('❌ take error:', err);
+    reply(`💥 Failed to take sticker:\n${err.message}`);
   }
   break;
+}
+            // ================STICKER=================
+case 's': 
+case 'sticker': {
+  try {
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+    const ffmpeg = require('fluent-ffmpeg');
+    const { imageToWebp, videoToWebp, writeExifImg, writeExifVid } = require('./library/exif');
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg =
+      (quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage)) ||
+      m.message?.imageMessage ||
+      m.message?.videoMessage;
+
+    if (!msg) {
+      return reply(`⚠️ Reply to an *image* or *video* with caption *${command}*\n\n🎥 *Max Video Duration:* 30 seconds`);
+    }
+
+    const mime = msg.mimetype || '';
+    if (!/image|video/.test(mime)) {
+      return reply(`⚠️ Only works on *image* or *video* messages!`);
+    }
+
+    // ⏳ Duration check
+    if (msg.videoMessage && msg.videoMessage.seconds > 30) {
+      return reply("⚠️ Maximum video duration is 30 seconds!");
+    }
+
+    reply("🪄 Creating your sticker...");
+
+    // ✅ Download the media
+    const stream = await downloadContentFromMessage(msg, mime.split('/')[0]);
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+    let webpPath;
+    if (/image/.test(mime)) {
+      webpPath = await writeExifImg(buffer, {
+        packname: config.PACK_NAME || "Trashcore Stickers",
+        author: config.AUTHOR || "Trashcore",
+      });
+    } else {
+      webpPath = await writeExifVid(buffer, {
+        packname: config.PACK_NAME || "Trashcore Stickers",
+        author: config.AUTHOR || "Trashcore",
+      });
+    }
+
+    // ✅ Read final webp buffer
+    const stickerBuffer = fs.readFileSync(webpPath);
+
+    await trashcore.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m });
+
+    // ✅ Cleanup temp
+    fs.unlinkSync(webpPath);
+  } catch (err) {
+    console.error("❌ sticker error:", err);
+    reply(`💥 Failed to create sticker:\n${err.message}`);
+  }
+  break;
+}
+            // =================EXEC=================
+case 'exec': {
+const { exec } = require("child_process");
+    try {
+        if (!isOwner) return reply("❌ You are not authorized to use this command!");
+        if (!args[0]) return reply("⚠️ Please provide a shell command.\n\nExample:\n.exec ls");
+
+        const command = args.join(" ");
+        exec(command, { timeout: 60000 }, (error, stdout, stderr) => {
+            if (error) {
+                return reply(`❌ *Error:*\n\`\`\`${error.message}\`\`\``);
+            }
+            if (stderr) {
+                return reply(`⚠️ *Stderr:*\n\`\`\`${stderr}\`\`\``);
+            }
+            if (stdout.trim()) {
+                return reply(`✅ *Output:*\n\`\`\`${stdout.trim()}\`\`\``);
+            } else {
+                return reply("✅ Command executed successfully (no output).");
+            }
+        });
+    } catch (err) {
+        console.error("Exec command error:", err);
+        await reply(`❌ Unexpected error:\n${err.message}`);
+    }
+    break;
+}
+            // =================EVAL=================
+case 'eval': {
+    try {
+        if (!isOwner) return reply("❌ You are not authorized to use this command!");
+        if (!args[0]) return reply("⚠️ Please provide JavaScript code to evaluate.\n\nExample:\n.eval 2 + 2");
+
+        let code = args.join(" ");
+        let evaled;
+
+        try {
+            evaled = await eval(`(async () => { ${code} })()`);
+        } catch (err) {
+            return reply(`❌ *Eval Error:*\n\`\`\`${err.message}\`\`\``);
+        }
+
+        if (typeof evaled !== "string") evaled = require("util").inspect(evaled, { depth: 1 });
+
+        await reply(`✅ *Result:*\n\`\`\`${evaled}\`\`\``);
+    } catch (err) {
+        console.error("Eval command error:", err);
+        await reply(`❌ Unexpected error:\n${err.message}`);
+    }
+    break;
 }
             // ================= OWNER ONLY COMMANDS =================
             default: {
@@ -3282,14 +3537,10 @@ case 'ephoto': {
 };
 
 // =============== HOT RELOAD ===============
-let file = require.resolve(__filename);
+let file = require.resolve(__filename)
 fs.watchFile(file, () => {
-    fs.unwatchFile(file);
-    console.log(`${colors.bgGreen}${colors.white}♻️ Update detected on ${__filename}${colors.reset}`);
-    delete require.cache[file];
-    try { 
-        require(file); 
-    } catch (err) {
-        console.error(`${colors.bgGreen}${colors.yellow}❌ Error reloading case.js:${colors.reset}`, err);
-    }
-});
+fs.unwatchFile(file)
+console.log(`Update File 📁 : ${__filename}`)
+delete require.cache[file]
+require(file)
+})

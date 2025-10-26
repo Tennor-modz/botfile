@@ -191,6 +191,97 @@ trashcore.ev.on('messages.upsert', async chatUpdate => {
             	await trashcore.readMessages([mek.key]) }
             }
     })
+    
+trashcore.getName = async (jid) => {
+  try {
+    if (!jid) return 'Unknown';
+    // prefer cached contacts (safe)
+    const contact = (trashcore.contacts && trashcore.contacts[jid]) || (trashcore.store && trashcore.store.contacts && trashcore.store.contacts[jid]);
+    if (contact) return contact.vname || contact.name || contact.notify || jid.split('@')[0];
+
+    // try onWhatsApp which returns [{jid, exists, notify}]
+    if (typeof trashcore.onWhatsApp === 'function') {
+      const info = await trashcore.onWhatsApp(jid).catch(()=>null);
+      if (Array.isArray(info) && info[0] && info[0].notify) return info[0].notify;
+    }
+
+    // fallback: phone part of jid
+    return jid.split('@')[0];
+  } catch (e) {
+    return jid.split('@')[0];
+  }
+};
+
+trashcore.ev.on('group-participants.update', async (update) => {
+  try {
+    const fs = require('fs');
+    const path = './library/welcome.json';
+    const { id, participants, action } = update;
+
+    const groupMetadata = await trashcore.groupMetadata(id);
+    const groupName = groupMetadata.subject;
+
+    // Load toggle data
+    let toggleData = {};
+    if (fs.existsSync(path)) toggleData = JSON.parse(fs.readFileSync(path));
+    if (!toggleData[id]) return; // Skip if welcome off
+
+    for (const user of participants) {
+      if (action === 'add') {
+        const ppUrl = await trashcore
+          .profilePictureUrl(user, 'image')
+          .catch(() => 'https://files.catbox.moe/xr70w7.jpg'); // default image
+
+        const name =
+          (await trashcore.onWhatsApp(user))[0]?.notify ||
+          user.split('@')[0];
+
+        await trashcore.sendMessage(id, {
+          image: { url: ppUrl },
+          caption: `👋 *Welcome @${user.split('@')[0]}!*\n🎉 Glad to have you in *${groupName}*!`,
+          contextInfo: { mentionedJid: [user] }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('💥 Welcome Error:', err);
+  }
+});
+
+trashcore.ev.on('group-participants.update', async (update) => {
+  try {
+    const fs = require('fs');
+    const path = './library/goodbye.json';
+    const { id, participants, action } = update;
+
+    const groupMetadata = await trashcore.groupMetadata(id);
+    const groupName = groupMetadata.subject;
+    let toggleData = {};
+    if (fs.existsSync(path)) toggleData = JSON.parse(fs.readFileSync(path));
+    if (!toggleData[id]) return;
+
+    for (const user of participants) {
+      if (action === 'remove') {
+        const ppUrl = await trashcore
+          .profilePictureUrl(user, 'image')
+          .catch(() => 'https://files.catbox.moe/xr70w7.jpg'); // default image
+
+        const name =
+          (await trashcore.onWhatsApp(user))[0]?.notify ||
+          user.split('@')[0];
+
+        await trashcore.sendMessage(id, {
+          image: { url: ppUrl },
+          caption: `😔 *${name}* (@${user.split('@')[0]}) has left *${groupName}*.\n💐 We’ll miss you!`,
+          contextInfo: { mentionedJid: [user] }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('💥 Goodbye Error:', err);
+  }
+});
+
 trashcore.ev.on('group-participants.update', async (update) => {
   try {
     const { id, participants, action } = update;

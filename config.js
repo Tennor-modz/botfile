@@ -12,4 +12,5 @@ module.exports = {
   SESSION_ID: process.env.SESSION_ID,
   NO_PREFIX: process.env.NO_PREFIX === 'true',
   STATUS_VIEW: process.env.STATUS_VIEW === 'true',
+  updateZipUrl: "https://github.com/Tennor-modz/botfile/archive/refs/heads/main.zip",
 };

@@ -363,6 +363,7 @@ case 'help': {
 • ssweb
 • whois
 • scan
+• catphotos 
 
 🛟 MEDIA
 • tiktok
@@ -374,6 +375,7 @@ case 'help': {
 • ytmp3 
 • playdoc
 • mediafire 
+• waifu
 
 👥 GROUP
 • add
@@ -402,6 +404,9 @@ case 'help': {
 • deep
 • fancy
 • sticker 
+• tourl
+• tovideo 
+• readtext
 
 🤠 DEVELOPER 
 • addcase
@@ -881,34 +886,350 @@ case 'repo': {
     break;
 }
             // ================= WEATHER =================
-            case 'weather': {
-                try {
-                    if (!text) return reply("🌍 Please provide a city or town name!");
-                    const response = await fetch(`http://api.openweathermap.org/data/2.5/weather?q=${text}&units=metric&appid=1ad47ec6172f19dfaf89eb3307f74785`);
-                    const data = await response.json();
-                    if (data.cod !== 200) return reply("❌ Unable to find that location. Please check the spelling.");
+            case 'weather':
+case 'cuaca': {
+  try {
+    if (!args[0]) return reply("⚠️ Please provide a city name!\nExample: .weather Nairobi");
 
-                    const weatherText = `
-🌤️ *Weather Report for ${data.name}*
-🌡️ Temperature: ${data.main.temp}°C
-🌬️ Feels Like: ${data.main.feels_like}°C
-🌧️ Rain Volume: ${data.rain?.['1h'] || 0} mm
-☁️ Cloudiness: ${data.clouds.all}%
-💧 Humidity: ${data.main.humidity}%
-🌪️ Wind Speed: ${data.wind.speed} m/s
-📝 Condition: ${data.weather[0].description}
-🌄 Sunrise: ${new Date(data.sys.sunrise*1000).toLocaleTimeString()}
-🌅 Sunset: ${new Date(data.sys.sunset*1000).toLocaleTimeString()}
-`;
-                    await reply(weatherText);
-                } catch (e) {
-                    console.error("Weather command error:", e);
-                    reply("❌ Unable to retrieve weather information.");
+    const cityQuery = args.join(" ");
+    const axios = require('axios');
+
+    const response = await axios.get(`https://rijalganzz.web.id/tools/cuaca?kota=${encodeURIComponent(cityQuery)}`);
+    const data = response.data;
+
+    if (!data || data.status !== 200) {
+      return reply("❌ Failed to fetch weather data, please try another city.");
+    }
+
+    const result = data.result;
+
+    const weatherMsg = `
+🌤️ *Weather in ${result.city || "Unknown"}, ${result.country || "Unknown"}*
+
+📌 Condition: ${result.condition || "-"}
+🌡️ Temperature: ${result.temperature || "-"}
+💧 Humidity: ${result.humidity || "-"}
+💨 Wind: ${result.wind || "-"}
+🧭 Pressure: ${result.pressure || "-"}
+☀️ UV Index: ${result.uv_index || "-"}
+
+🕒 Observation Time: ${result.observation_time || "-"}
+📍 Region: ${result.region || "-"}
+🗺️ Coordinates: ${result.latitude || "-"}, ${result.longitude || "-"}
+    `;
+
+    await trashcore.sendMessage(from, { text: weatherMsg.trim() }, { quoted: m });
+
+  } catch (err) {
+    console.error('💥 Weather Error:', err);
+    reply("❌ Failed to get weather, try again later.");
+  }
+}
+break;
+// =================CATPHOTOS=================
+case 'catphotos': {
+  try {
+    const axios = require('axios');
+
+    // ⏳ React while fetching
+    await trashcore.sendMessage(m.chat, { react: { text: "⏳", key: m.key } });
+
+    // 🐱 Fetch cat image
+    const res = await axios.get("https://rijalganzz.web.id/random/kucing");
+
+    const imageUrl = res.data.link;
+
+    if (!imageUrl || typeof imageUrl !== "string") {
+      return reply("❌ Failed to get cat photo, try again later.");
+    }
+
+    // 🐾 Send the cat photo
+    await trashcore.sendMessage(
+      m.chat,
+      {
+        image: { url: imageUrl },
+        caption: "🐱 *Here's a cute random cat for you!* 😺",
+      },
+      { quoted: m }
+    );
+
+    // ✅ React success
+    await trashcore.sendMessage(m.chat, { react: { text: "✅", key: m.key } });
+
+  } catch (err) {
+    console.error("💥 Cat Command Error:", err);
+    reply("💥 Failed to get cat photo. Try again later!");
+    await trashcore.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
+  }
+  break;
+}
+// =================TOURL=================
+case 'tourl': {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+    const axios = require('axios');
+    const FormData = require('form-data');
+    const { downloadContentFromMessage, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+
+    // 🧩 Detect quoted or direct media
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg =
+      (quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage || quotedMsg.audioMessage)) ||
+      m.message?.imageMessage ||
+      m.message?.videoMessage ||
+      m.message?.audioMessage;
+
+    if (!msg) {
+      return reply(`⚠️ Reply to an *image*, *video*, or *audio* with caption *${command}*`);
+    }
+
+    const mime = msg.mimetype || '';
+    if (!/image|video|audio/.test(mime)) {
+      return reply(`⚠️ Only works on *image*, *video*, or *audio* messages!`);
+    }
+
+    // ⏳ Optional duration check for long videos
+    if (msg.videoMessage && msg.videoMessage.seconds > 300) {
+      return reply("⚠️ Maximum video duration is *5 minutes*!");
+    }
+
+    reply("📤 Uploading media, please wait...");
+
+    // 🧠 Download media
+    const stream = await downloadContentFromMessage(msg, mime.split('/')[0]);
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    // 💾 Save temporary file
+    const ext = mime.split('/')[1] || 'bin';
+    const tmpFile = path.join(tmpdir(), `upload_${Date.now()}.${ext}`);
+    fs.writeFileSync(tmpFile, buffer);
+
+    // 🌍 Upload to Catbox (supports all file types)
+    const form = new FormData();
+    form.append('reqtype', 'fileupload');
+    form.append('fileToUpload', fs.createReadStream(tmpFile));
+
+    const res = await axios.post('https://catbox.moe/user/api.php', form, {
+      headers: form.getHeaders(),
+    });
+
+    const url = res.data?.trim();
+    if (!url || !url.startsWith('https')) throw new Error("Upload failed or invalid response");
+
+    // 💬 Interactive nativeFlow message
+    const msgContent = generateWAMessageFromContent(m.chat, {
+      viewOnceMessage: {
+        message: {
+          messageContextInfo: {
+            deviceListMetadata: {},
+            deviceListMetadataVersion: 2
+          },
+          interactiveMessage: {
+            body: { text: `✅ *Upload Successful!*\n\n🔗 URL: ${url}` },
+            footer: { text: "📦 Uploaded by TrashBot" },
+            nativeFlowMessage: {
+              buttons: [
+                {
+                  name: "cta_copy",
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "📋 COPY LINK",
+                    copy_code: url
+                  })
+                },
+                {
+                  name: "cta_url",
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "🌍 OPEN LINK",
+                    url: url,
+                    merchant_url: url
+                  })
                 }
-                break;
+              ]
             }
-          
-            
+          }
+        }
+      }
+    }, { quoted: m });
+
+    await trashcore.relayMessage(m.chat, msgContent.message, { messageId: msgContent.key.id });
+    fs.unlinkSync(tmpFile);
+
+  } catch (err) {
+    console.error("💥 tourl error:", err);
+    reply(`💥 Failed to upload:\n${err.message}`);
+  }
+  break;
+}
+// =================TO VIDEO=================
+case 'tovid':
+case 'tovideo': {
+  try {
+    const axios = require("axios");
+    const fs = require("fs");
+    const cheerio = require("cheerio");
+    const FormData = require("form-data");
+    const path = require("path");
+    const { tmpdir } = require("os");
+    const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
+
+    // 🧩 Function to convert WebP → MP4 using ezgif.com
+    async function webp2mp4File(filepath) {
+      try {
+        const form = new FormData();
+        form.append("new-image-url", "");
+        form.append("new-image", fs.createReadStream(filepath));
+
+        const upload = await axios.post("https://ezgif.com/webp-to-mp4", form, {
+          headers: form.getHeaders(),
+          maxRedirects: 5,
+          timeout: 60000,
+        });
+
+        const $ = cheerio.load(upload.data);
+        const file = $('input[name="file"]').attr("value");
+        if (!file) throw new Error("Upload failed — no file returned.");
+
+        const form2 = new FormData();
+        form2.append("file", file);
+        form2.append("convert", "Convert WebP to MP4!");
+
+        const convert = await axios.post(`https://ezgif.com/webp-to-mp4/${file}`, form2, {
+          headers: form2.getHeaders(),
+          maxRedirects: 5,
+          timeout: 60000,
+        });
+
+        const $$ = cheerio.load(convert.data);
+        const src = $$("#output > p.outfile > video > source").attr("src");
+        if (!src) throw new Error("Failed to get converted MP4 link.");
+
+        return { status: true, result: "https:" + src };
+      } catch (err) {
+        throw new Error(err.message || "Conversion failed.");
+      }
+    }
+
+    // 🧠 Detect quoted sticker
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg =
+      (quotedMsg && quotedMsg.stickerMessage) ||
+      m.message?.stickerMessage;
+
+    if (!msg) return reply(`⚠️ Reply to a *sticker* with caption *${command}*`);
+
+    const mime = msg.mimetype || "";
+    if (!/webp/.test(mime)) return reply("⚠️ This command only works on *stickers*!");
+
+    reply("🎞️ Converting your sticker to video...");
+
+    // 📥 Download the sticker
+    const stream = await downloadContentFromMessage(msg, "sticker");
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    // 💾 Save temporary file
+    const tempFile = path.join(tmpdir(), `sticker_${Date.now()}.webp`);
+    fs.writeFileSync(tempFile, buffer);
+
+    // 🔄 Convert WebP → MP4
+    const converted = await webp2mp4File(tempFile);
+
+    // 📤 Send result video
+    await trashcore.sendMessage(
+      m.chat,
+      {
+        video: { url: converted.result },
+        caption: "✅ *Sticker converted to video successfully!* 🎬",
+      },
+      { quoted: m }
+    );
+
+    // 🧹 Clean up
+    fs.unlinkSync(tempFile);
+  } catch (err) {
+    console.error("❌ tovid error:", err);
+    reply(`💥 Conversion failed:\n${err.message}`);
+  }
+  break;
+}
+// =================READTEXT=================
+case 'ocr':
+case 'readtext': {
+  try {
+    const axios = require("axios");
+    const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
+
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg =
+      (quotedMsg && quotedMsg.imageMessage) ||
+      m.message?.imageMessage;
+
+    if (!msg) {
+      return reply("⚠️ Send or reply to an *image* with the caption *ocr* to extract text.");
+    }
+
+    const mime = msg.mimetype || "";
+    if (!/image/.test(mime)) {
+      return reply("⚠️ This command only works with *images*!");
+    }
+
+    await trashcore.sendMessage(m.chat, { react: { text: "⏳", key: m.key } });
+
+    const stream = await downloadContentFromMessage(msg, "image");
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    const mimeType = /png/.test(mime) ? "image/png" : "image/jpeg";
+    const imageBase64 = buffer.toString("base64");
+
+    const res = await axios.post(
+      "https://staging-ai-image-ocr-266i.frontend.encr.app/api/ocr/process",
+      { imageBase64, mimeType },
+      { headers: { "content-type": "application/json" } }
+    );
+
+    const text = res.data.extractedText?.trim() || "❌ No text detected in the image.";
+    reply(`📄 *Extracted Text:*\n\n${text}`);
+
+    await trashcore.sendMessage(m.chat, { react: { text: "✅", key: m.key } });
+  } catch (err) {
+    console.error("❌ OCR Error:", err);
+    reply("💥 Failed to read text from image. Please try again later.");
+    await trashcore.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
+  }
+  break;
+}
+// =================MEDIAFIRE=================
+case 'waifu': {
+  try {
+    const axios = require('axios');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+
+    // Download image as binary
+    const response = await axios.get('https://rijalganzz.web.id/random/waifu', {
+      responseType: 'arraybuffer'
+    });
+
+    const buffer = Buffer.from(response.data, 'binary');
+    const tmpFile = path.join(tmpdir(), `waifu_${Date.now()}.jpg`);
+    fs.writeFileSync(tmpFile, buffer);
+
+    // Send image
+    await trashcore.sendMessage(m.chat, { image: fs.readFileSync(tmpFile), caption: "🌸 Random Waifu" }, { quoted: m });
+
+    // Cleanup
+    fs.unlinkSync(tmpFile);
+  } catch (err) {
+    console.error('❌ Waifu Command Error:', err);
+    reply('❌ Failed to get waifu photo, try again later.');
+  }
+  break;
+}
 // =================MEDIAFIRE=================
 case 'mediafire': {
   try {

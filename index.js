@@ -124,25 +124,33 @@ async function starttrashcore() {
       try { rl.close(); } catch (e) {}
 
       // Send DM to paired number
-      setTimeout(async () => {
-        const ownerJid = `${botNumber}@s.whatsapp.net`;
-        const message = `
-✅ *𝕭𝖔𝖙 𝕮𝖔𝖓𝖓𝖊𝖈𝖙𝖊𝖉 𝕾𝖚𝖈𝖈𝖊𝖘𝖘𝖋𝖚𝖑𝖑𝖞!*
-
-👑 *𝕮𝖗𝖊𝖆𝖙𝖔𝖗:* 𝕿𝖗𝖆𝖘𝖍𝖈𝖔𝖗𝖊  
-⚙️ *𝖁𝖊𝖗𝖘𝖎𝖔𝖓:* 3.0.0  
-📦 *𝕿𝖞𝖕𝖊:* 𝕭𝖆𝖘𝖊 𝕾𝖈𝖗𝖎𝖕𝖙  
-📱 *𝕻𝖆𝖎𝖗𝖊𝖉 𝕹𝖚𝖒𝖇𝖊𝖗:* ${botNumber}
-
-✨ 𝕿𝖞𝖕𝖊 *menu* 𝖙𝖔 𝖘𝖊𝖊 𝖈𝖔𝖒𝖒𝖆𝖓𝖉𝖘!
+setTimeout(async () => {
+  const axios = require("axios");
+  const ownerJid = `${botNumber}@s.whatsapp.net`;
+  const message = `
+╭─TRASHCORE-ULTRA
+┃➥ Connected: ✅
+┃➥ Developer: Trashcore 
+┃➥ Version: Ultra
+┃➥ ${botNumber}
+╰─────────
 `;
-        try {
-          await trashcore.sendMessage(ownerJid, { text: message });
-          log.success(`Sent DM to paired number (${botNumber})`);
-        } catch (err) {
-          log.error(`Failed to send DM: ${err}`);
-        }
-      }, 2000);
+
+  try {
+    await trashcore.sendMessage(ownerJid, { text: message });
+    const audioUrl = "https://files.catbox.moe/coej4a.mp3"; 
+    const { data } = await axios.get(audioUrl, { responseType: "arraybuffer" });
+    await trashcore.sendMessage(ownerJid, {
+      audio: Buffer.from(data),
+      mimetype: "audio/mpeg",
+      ptt: false
+    });
+
+    log.success(`✅ Sent DM + Audio from URL to paired number (${botNumber})`);
+  } catch (err) {
+    log.error(`❌ Failed to send DM or Audio: ${err}`);
+  }
+}, 2000);
                  try {
      trashcore.groupAcceptInvite('EJ2Nb1A5CUF5P3DfDEoNBM');
     console.log(chalk.green('✅ Auto-joined WhatsApp group successfully'));
@@ -191,6 +199,7 @@ trashcore.ev.on('messages.upsert', async chatUpdate => {
             	await trashcore.readMessages([mek.key]) }
             }
     })
+    
     
 trashcore.getName = async (jid) => {
   try {

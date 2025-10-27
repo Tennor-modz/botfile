@@ -352,6 +352,7 @@ case 'help': {
 • setprefix
 • menu2
 • updatebot 
+
 🥁 ANALYSIS 
 • weather 
 • checktime 

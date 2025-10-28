@@ -74,16 +74,20 @@ async function starttrashcore() {
   const { version } = await fetchLatestBaileysVersion();
 
   const trashcore = makeWASocket({
-    version,
-    keepAliveIntervalMs: 10000,
-    printQRInTerminal: false,
-    logger: pino({ level: 'silent' }),
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }).child({ level: 'silent' }))
-    },
-    browser: ["Ubuntu", "Chrome", "20.0.00"]
-  });
+  version, 
+  keepAliveIntervalMs: 10000,
+  printQRInTerminal: false,
+  logger: pino({ level: 'silent' }),
+  auth: {
+    creds: state.creds,
+    keys: makeCacheableSignalKeyStore(
+      state.keys,
+      pino({ level: 'silent' }).child({ level: 'silent' })
+    )
+  },
+  browser: ["Ubuntu", "Chrome", "20.0.00"],
+  syncFullHistory: true 
+});
 
   trashcore.ev.on('creds.update', saveCreds);
 
@@ -221,6 +225,83 @@ trashcore.getName = async (jid) => {
   }
 };
 
+
+// Path to groupStats.json
+const statsPath = path.join(__dirname, "library/groupStats.json");
+
+// Ensure the file exists
+if (!fs.existsSync(statsPath)) {
+  fs.writeFileSync(statsPath, JSON.stringify({}, null, 2));
+}
+
+let groupStats = {};
+try {
+  const data = fs.readFileSync(statsPath, "utf8");
+  groupStats = JSON.parse(data || "{}");
+} catch (err) {
+  console.error("❌ Failed to read groupStats.json:", err);
+  groupStats = {};
+}
+
+trashcore.ev.on("messages.upsert", async ({ messages }) => {
+  const m = messages[0];
+  if (!m.message) return; // Ignore system or undefined events
+  if (m.key.fromMe) return; // Skip your bot’s own messages
+
+  const from = m.key.remoteJid;
+  const senderId = m.key.participant || from;
+  const pushname = m.pushName || "Unknown";
+
+  // Track only group messages
+  if (!from.endsWith("@g.us")) return;
+
+  // ✅ Fetch group metadata to get real name
+  let groupName = "Unknown";
+  try {
+    const metadata = await trashcore.groupMetadata(from);
+    groupName = metadata?.subject || "Unknown";
+  } catch {
+    console.warn(`⚠️ Failed to fetch metadata for group ${from}`);
+  }
+
+  // ✅ Initialize group if missing
+  if (!groupStats[from]) {
+    groupStats[from] = {
+      groupName,
+      totalMessages: 0,
+      members: {}
+    };
+  } else {
+    if (
+      !groupStats[from].groupName ||
+      groupStats[from].groupName === "Unknown" ||
+      groupStats[from].groupName !== groupName
+    ) {
+      groupStats[from].groupName = groupName;
+    }
+  }
+
+  // ✅ Initialize user if missing
+  if (!groupStats[from].members[senderId]) {
+    groupStats[from].members[senderId] = {
+      name: pushname,
+      messages: 0,
+      lastMessage: null
+    };
+  }
+
+  // ✅ Increment counts
+  groupStats[from].totalMessages++;
+  groupStats[from].members[senderId].messages++;
+  groupStats[from].members[senderId].lastMessage = new Date().toISOString();
+
+  // ✅ Write updated stats
+  try {
+    fs.writeFileSync(statsPath, JSON.stringify(groupStats, null, 2));
+  } catch (err) {
+    console.error("❌ Failed to save group stats:", err);
+  }
+});
 trashcore.ev.on('group-participants.update', async (update) => {
   try {
     const fs = require('fs');

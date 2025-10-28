@@ -395,6 +395,8 @@ case 'help': {
 • unmute
 • setwelcome 
 • setgoodbye 
+• listactive 
+• listinactive 
 
 📍 CONVERSION
 • toaudio 
@@ -417,6 +419,7 @@ case 'help': {
 • delfile
 • restart 
 • getcase 
+• getdep
 
 👤 BASIC
 • copilot
@@ -1680,6 +1683,120 @@ case 'whois': {
   break;
 }
 
+// =================LISTACTIVE=================
+case 'listactive': {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const groupStatsPath = path.join(__dirname, "library/groupStats.json");
+
+    if (!fs.existsSync(groupStatsPath))
+      return reply("⚠️ No stats file found.");
+
+    const groupStats = JSON.parse(fs.readFileSync(groupStatsPath, "utf8"));
+    const groupId = m.chat;
+
+    // ✅ Get real group info
+    const groupMetadata = await trashcore.groupMetadata(groupId);
+    const groupName = groupMetadata.subject || "Unknown Group";
+
+    // ✅ Ensure this group has stats
+    if (!groupStats[groupId] || !groupStats[groupId].members)
+      return reply(`⚠️ No message data found for *${groupName}* yet.`);
+
+    const groupData = groupStats[groupId];
+    const members = Object.entries(groupData.members);
+
+    if (members.length === 0)
+      return reply(`📭 No members have sent messages in *${groupName}* yet.`);
+
+    // ✅ Sort members by most active
+    const sorted = members.sort((a, b) => b[1].messages - a[1].messages);
+
+    let text = `👥 *Top Active Members in ${groupName}*\n\n`;
+
+    sorted.forEach(([id, data], index) => {
+      const tag = id.split("@")[0];
+      text += `${index + 1}. @${tag} — 💬 ${data.messages} messages\n`;
+    });
+
+    text += `\n📊 *Total Messages:* ${groupData.totalMessages}\n👤 *Tracked Members:* ${members.length}`;
+
+    await trashcore.sendMessage(
+      m.chat,
+      { text, mentions: sorted.map(([id]) => id) },
+      { quoted: m }
+    );
+
+  } catch (err) {
+    console.error("❌ listactive error:", err);
+    await reply("❌ Failed to fetch active members.");
+  }
+  break;
+}
+// =================LISTINACTIVE=================
+case 'listinactive': {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const groupStatsPath = path.join(__dirname, "library/groupStats.json");
+
+    if (!fs.existsSync(groupStatsPath))
+      return reply("⚠️ No stats file found.");
+
+    const groupStats = JSON.parse(fs.readFileSync(groupStatsPath, "utf8"));
+    const groupId = m.chat;
+
+    // ✅ Get actual group info
+    const groupMetadata = await trashcore.groupMetadata(groupId);
+    const groupName = groupMetadata.subject || "Unknown Group";
+
+    // ✅ Get stored group data (or empty fallback)
+    const groupData = groupStats[groupId] || { totalMessages: 0, members: {} };
+
+    // ✅ Prepare members list (include all participants)
+    const allMembers = groupMetadata.participants.map(p => p.id);
+    const memberEntries = allMembers.map(id => {
+      const data = groupData.members?.[id] || {
+        name: "Unknown",
+        messages: 0,
+        lastMessage: null
+      };
+      return [id, data];
+    });
+
+    // ✅ Sort ascending by message count (least active first)
+    const sorted = memberEntries.sort((a, b) => a[1].messages - b[1].messages);
+
+    // ✅ Get top 10 least active
+    const inactiveMembers = sorted.slice(0, 10);
+
+    let text = `😴 *Least Active Members in ${groupName}*\n\n`;
+
+    inactiveMembers.forEach(([id, data], index) => {
+      const tag = id.split("@")[0];
+      const lastSeen = data.lastMessage
+        ? new Date(data.lastMessage).toLocaleString("en-US", { hour12: true })
+        : "Never";
+      const status = data.messages === 0 ? "🚫 No messages" : `${data.messages} messages`;
+
+      text += `${index + 1}. @${tag}\n   💬 ${status}\n   🕒 Last Msg: ${lastSeen}\n\n`;
+    });
+
+    text += `📊 *Total Messages:* ${groupData.totalMessages || 0}\n👤 *Tracked Members:* ${allMembers.length}`;
+
+    await trashcore.sendMessage(
+      m.chat,
+      { text, mentions: inactiveMembers.map(([id]) => id) },
+      { quoted: m }
+    );
+
+  } catch (err) {
+    console.error("❌ listinactive error:", err);
+    await reply("❌ Failed to fetch inactive members.");
+  }
+  break;
+}
 // ================= SETDP=================
 case 'setdp': {
   try {

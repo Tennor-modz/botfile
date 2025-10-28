@@ -423,6 +423,7 @@ case 'help': {
 • cat
 • vv
 • eval
+• enc
 • exec
 • ls
 • >
@@ -854,6 +855,90 @@ case 'pinterest': {
   } catch (err) {
     console.error('Pinterest command error:', err);
     await reply(`💥 Error retrieving Pinterest image: ${err.message}`);
+  }
+  break;
+}
+            // ================= ENC =================
+case 'enc':
+case 'encrypt': {
+  try {
+    const JsConfuser = require('js-confuser');
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const fs = require('fs');
+
+    // Ensure we have a quoted message
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage || (m.quoted ? m.quoted.message : null);
+    if (!quotedMsg) return reply('❌ Please reply to the .js file you want to encrypt.');
+
+    const doc = quotedMsg.documentMessage;
+    if (!doc || !doc.fileName || !doc.fileName.endsWith('.js')) {
+      return reply('❌ Please reply to a JavaScript (.js) file to encrypt.');
+    }
+
+    // Download the file (stream -> buffer)
+    const stream = await downloadContentFromMessage(doc, 'document');
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    if (!buffer || buffer.length === 0) return reply('❌ Failed to download the file. Try again.');
+
+    // Show a reaction while processing
+    await trashcore.sendMessage(m.chat, { react: { text: '🕛', key: m.key } });
+
+    const fileName = doc.fileName;
+
+    // Obfuscate
+    const obfuscatedCode = await JsConfuser.obfuscate(buffer.toString('utf8'), {
+      target: "node",
+      preset: "high",
+      compact: true,
+      minify: true,
+      flatten: true,
+      identifierGenerator: function () {
+        const originalString = "素GIDDY晴TENNOR晴" + "素GIDDY晴TENNOR晴";
+        const removeUnwantedChars = (input) => input.replace(/[^a-zA-Z素GIDDY晴TENNOR晴]/g, "");
+        const randomString = (length) => {
+          let result = "";
+          const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+          for (let i = 0; i < length; i++) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+          }
+          return result;
+        };
+        return removeUnwantedChars(originalString) + randomString(2);
+      },
+      renameVariables: true,
+      renameGlobals: true,
+      stringEncoding: true,
+      stringSplitting: 0.0,
+      stringConcealing: true,
+      stringCompression: true,
+      duplicateLiteralsRemoval: 1.0,
+      shuffle: { hash: 0.0, true: 0.0 },
+      stack: true,
+      controlFlowFlattening: 1.0,
+      opaquePredicates: 0.9,
+      deadCode: 0.0,
+      dispatcher: true,
+      rgf: false,
+      calculator: true,
+      hexadecimalNumbers: true,
+      movedDeclarations: true,
+      objectExtraction: true,
+      globalConcealing: true,
+    });
+
+    // Send obfuscated file back
+    await trashcore.sendMessage(m.chat, {
+      document: Buffer.from(obfuscatedCode, 'utf8'),
+      mimetype: 'application/javascript',
+      fileName: `${fileName}`,
+      caption: `• Successful Encrypt\n• Type: Hard Code\n• @Tennor-modz`
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error('Error during encryption:', err);
+    await reply(`❌ An error occurred: ${err.message || String(err)}`);
   }
   break;
 }
@@ -1895,24 +1980,26 @@ case 'ssweb': {
 case 'githubstalk':
 case 'gitstalk': {
   try {
+    const axios = require('axios');
     const username = args[0];
-    if (!username) return reply('👤 Please provide a GitHub username.\n\nExample:\n.githubstalk Tennor-modz');
+
+    if (!username)
+      return reply('👤 Please provide a GitHub username.\n\nExample:\n.githubstalk Tennor-modz');
 
     await reply(`🔍 Fetching GitHub profile for *${username}*...`);
 
-    const fetch = require('node-fetch');
     const apiUrl = `https://savant-api.vercel.app/stalk/github?user=${encodeURIComponent(username)}`;
 
-    const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status} - Failed to fetch user data`);
+    const res = await axios.get(apiUrl);
+    const data = res.data;
 
-    const data = await res.json();
     const user = data.result || data.data || data || {};
 
-    // If no username returned, user not found
-    if (!user.username && !user.name) return reply(`⚠️ User *${username}* not found on GitHub.`);
+    // Handle user not found
+    if (!user.username && !user.name)
+      return reply(`⚠️ User *${username}* not found on GitHub.`);
 
-    // Prepare caption message
+    // Prepare caption
     const caption = `🧑‍💻 *GitHub Stalk Result*\n\n` +
       `👤 *Name:* ${user.name || "N/A"}\n` +
       `💻 *Username:* ${user.username || username}\n` +
@@ -1925,11 +2012,11 @@ case 'gitstalk': {
       `⭐ *Created:* ${user.created_at || "Unknown"}\n\n` +
       `🔗 *Profile:* ${user.html_url || `https://github.com/${username}`}`;
 
-    // Send with avatar if available
+    // Send avatar if available
     if (user.avatar_url) {
       await trashcore.sendMessage(from, {
         image: { url: user.avatar_url },
-        caption,
+        caption
       }, { quoted: m });
     } else {
       await reply(caption);
@@ -2037,26 +2124,44 @@ Last updated: ${new Date().toLocaleString()}
 }
             // ================= GITCLONE =================
             case 'gitclone': {
-                try {
-                    if (!args[0]) return reply("❌ Provide a GitHub repo link.");
-                    if (!args[0].includes('github.com')) return reply("❌ Not a valid GitHub link!");
-                    const regex = /(?:https|git)(?::\/\/|@)github\.com[\/:]([^\/:]+)\/(.+)/i;
-                    let [, user, repo] = args[0].match(regex) || [];
-                    repo = repo.replace(/.git$/, '');
-                    const zipUrl = `https://api.github.com/repos/${user}/${repo}/zipball`;
-                    const head = await fetch(zipUrl, { method: 'HEAD' });
-                    const contentDisp = head.headers.get('content-disposition');
-                    const filenameMatch = contentDisp?.match(/attachment; filename=(.*)/);
-                    const filename = filenameMatch ? filenameMatch[1] : `${repo}.zip`;
-                    await trashcore.sendMessage(from, { document: { url: zipUrl }, fileName: filename, mimetype: 'application/zip' }, { quoted: m });
-                    await reply(`✅ Successfully fetched repository: *${user}/${repo}*`);
-                } catch (err) {
-                    console.error("gitclone error:", err);
-                    await reply("❌ Failed to clone repository.");
-                }
-                break;
-            }
+  try {
+    const axios = require('axios');
 
+    if (!args[0]) return reply("❌ Provide a GitHub repo link.");
+    if (!args[0].includes('github.com')) return reply("❌ Not a valid GitHub link!");
+
+    // Extract GitHub username and repository name
+    const regex = /(?:https|git)(?::\/\/|@)github\.com[\/:]([^\/:]+)\/(.+)/i;
+    let [, user, repo] = args[0].match(regex) || [];
+    if (!user || !repo) return reply("⚠️ Invalid repository format.");
+
+    repo = repo.replace(/.git$/, '');
+    const zipUrl = `https://api.github.com/repos/${user}/${repo}/zipball`;
+
+    // Perform a HEAD request to get filename info
+    const head = await axios.head(zipUrl);
+    const contentDisp = head.headers['content-disposition'];
+    const filenameMatch = contentDisp?.match(/attachment; filename=(.*)/);
+    const filename = filenameMatch ? filenameMatch[1] : `${repo}.zip`;
+
+    // Send ZIP file to user
+    await trashcore.sendMessage(
+      from,
+      {
+        document: { url: zipUrl },
+        fileName: filename,
+        mimetype: 'application/zip'
+      },
+      { quoted: m }
+    );
+
+    await reply(`✅ Successfully fetched repository: *${user}/${repo}*`);
+  } catch (err) {
+    console.error("gitclone error:", err);
+    await reply(`❌ Failed to clone repository.\nError: ${err.message}`);
+  }
+  break;
+}
 
             // ================= IG/FB DL =================
             case 'fb':
@@ -3652,7 +3757,6 @@ const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     if (!isGroup) return reply("❌ This command can only be used in groups!");
   if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
-    if (!!isOwner) return reply("⚠️ Only the owner can use this command!");
     if (!isBotAdmins) return reply("🚫 I need admin privileges to remove members!");
 
     // 🧩 Identify target user

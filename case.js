@@ -96,27 +96,54 @@ const isOwner = senderJid === botNumber;
    
 
 if (m.message) {
-  const date = new Date().toLocaleString();
   const isGroupMsg = m.isGroup;
   const body = m.body || m.messageStubType || "—";
-  const groupMetadata = m.isGroup ? await trashcore.groupMetadata(m.chat).catch(e => {}) : ''
-  const groupName = m.isGroup ? groupMetadata.subject : ''
-  const pushnameDisplay = pushname || "Unknown";
+  const pushnameDisplay = m.pushName || "Unknown";
   const command = body.startsWith(prefix) ? body.split(' ')[0] : null;
 
-  // 🌅 Time-based greeting
-  const hour = new Date().getHours();
+  // 🕒 Time in EAT
+  const date = new Date().toLocaleString("en-KE", {
+    timeZone: "Africa/Nairobi",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  const hour = new Date().toLocaleString("en-KE", {
+    timeZone: "Africa/Nairobi",
+    hour: "2-digit",
+    hour12: false,
+  });
+  const hourInt = parseInt(hour, 10);
   const ucapanWaktu =
-    hour < 12
-      ? "Good Morning"
-      : hour < 18
-      ? "Good Afternoon"
-      : "Good Evening";
+    hourInt < 12
+      ? "Good Morning ☀️"
+      : hourInt < 18
+      ? "Good Afternoon 🌤️"
+      : "Good Evening 🌙";
 
-  const headerColor = chalk.black.bold.bgHex('#ff5e78');  // Pink header
-  const subHeaderColor = chalk.white.bold.bgHex('#4a69bd'); // Blue header
-  const bodyColor = chalk.black.bgHex('#fdcb6e'); // Yellow box
+  // 🎨 Colors
+  const headerColor = chalk.black.bold.bgHex("#ff5e78");  // Pink header
+  const subHeaderColor = chalk.white.bold.bgHex("#4a69bd"); // Blue header
+  const bodyColor = chalk.black.bgHex("#fdcb6e"); // Yellow box
 
+  // 🏠 Fetch group metadata if group message safely
+  let groupName = "";
+  if (isGroupMsg) {
+    try {
+      const groupMetadata = await trashcore.groupMetadata(m.chat).catch(() => null);
+      groupName = groupMetadata?.subject || "Unknown Group";
+    } catch {
+      groupName = "Unknown Group";
+    }
+  }
+
+  // 🧾 Log output
   console.log(headerColor(`\n🌟 ${ucapanWaktu} 🌟`));
   console.log(
     subHeaderColor(
@@ -124,47 +151,15 @@ if (m.message) {
     )
   );
 
-  let info = `
-📅 DATE: ${date}
+  const info = `
+📅 DATE (EAT): ${date}
 💬 MESSAGE: ${body}
 🗣️ SENDERNAME: ${pushnameDisplay}
 👤 JID: ${m.sender}
-${isGroupMsg ? `🏠 GROUP: ${groupName || "Unknown Group"}` : ""}
-${command ? `🏷️ COMMAND: ${command}` : ""}
+${isGroupMsg ? `🏠 GROUP: ${groupName}` : ""}
 `;
 
   console.log(bodyColor(info));
-}
-// --- 🚨 ANTILINK 2.0 AUTO CHECK ---
-if (isGroup && global.settings?.antilink?.[from]?.enabled) {
-  const settings = global.settings.antilink[from];
-  const linkPattern = /(https?:\/\/[^\s]+)/gi;
-  const bodyText = body || '';
-
-  if (linkPattern.test(bodyText)) {
-    const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
-const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
-const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
-    const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
-    const isBotAdmin = groupAdmins.includes(botNumber);
-    const isSenderAdmin = groupAdmins.includes(sender);
-
-    if (!isSenderAdmin && isBotAdmin) {
-      try {
-        await trashcore.sendMessage(from, { delete: m.key });
-        await trashcore.sendMessage(from, {
-          text: `🚫 *Link detected and removed!*\nUser: @${sender.split('@')[0]}\nAction: ${settings.mode.toUpperCase()}`,
-          mentions: [sender],
-        });
-
-        if (settings.mode === "kick") {
-          await trashcore.groupParticipantsUpdate(from, [sender], "remove");
-        }
-      } catch (err) {
-        console.error("Antilink Enforcement Error:", err);
-      }
-    }
-  }
 }
 // --- 🚫 ANTI-TAG AUTO CHECK ---
 if (isGroup && global.settings?.antitag?.[from]?.enabled) {
@@ -3007,7 +3002,7 @@ case 'addfile': {
 }
 // ================= DEL CASE  =================
 case 'delcase': {
-  if (!isModerator) return reply("❌ This command is restricted to bot moderators only.");
+if (!isOwner) return reply("❌ Owner-only command.");
 
   try {
     const fs = require('fs');

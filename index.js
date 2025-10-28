@@ -167,7 +167,21 @@ setTimeout(async () => {
     }
   });
 
+const initAntiDelete = require('./antiDelete');
+trashcore.ev.on('connection.update', async (update) => {
+  const { connection } = update;
+  if (connection === 'open') {
+    const botNumber = trashcore.user.id.split(':')[0] + '@s.whatsapp.net';
 
+    initAntiDelete(trashcore, {
+      botNumber, // Automatically detected
+      dbPath: './library/antidelete.json',
+      enabled: true
+    });
+
+    console.log(`✅ AntiDelete active and sending deleted messages to ${botNumber}`);
+  }
+});
   // ================== Auto read/typing/record ==================
   async function autoReadPrivate(m) {
     const from = m.key.remoteJid;
@@ -224,8 +238,6 @@ trashcore.getName = async (jid) => {
     return jid.split('@')[0];
   }
 };
-
-
 // Path to groupStats.json
 const statsPath = path.join(__dirname, "library/groupStats.json");
 
@@ -261,7 +273,6 @@ trashcore.ev.on("messages.upsert", async ({ messages }) => {
     const metadata = await trashcore.groupMetadata(from);
     groupName = metadata?.subject || "Unknown";
   } catch {
-    console.warn(`⚠️ Failed to fetch metadata for group ${from}`);
   }
 
   // ✅ Initialize group if missing

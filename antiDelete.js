@@ -155,7 +155,7 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
       const senderJid = saved.sender || 'unknown@s.whatsapp.net';
       const userTag = `@${senderJid.split('@')[0]}`;
       const mention = [senderJid];
-      const header = `🛡️ *Anti-Delete*\nGroup: ${groupName}\nUser: ${userTag}`;
+      const header = `🛡️ *Anti-Delete*\nFrom: ${groupName}\nUser: ${userTag}`;
 
       // Text messages
       if (saved.type === 'text') {

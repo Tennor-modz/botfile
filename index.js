@@ -270,57 +270,52 @@ function saveStats() {
 
 trashcore.ev.on("messages.upsert", async ({ messages }) => {
   const m = messages[0];
-  if (!m?.message) return;
-  if (m.key.fromMe) return;
+  if (!m?.message) return; // skip empty/system messages
+  if (m.key.fromMe) return; // skip bot messages
 
   m.chat = m.key.remoteJid;
   const isGroup = m.chat.endsWith("@g.us");
   const chatType = isGroup ? "Group" : "Private";
-
   const senderId = m.key.participant || m.sender || m.chat;
   const pushname = m.pushName || "Unknown";
 
-  let groupMeta = null;
-  if (isGroup) {
-    groupMeta = await getGroupMetaSafe(trashcore, m.chat);
+  // ✅ Use local fallback for name (no metadata fetch)
+  const chatName = isGroup ? m.chat.split("@")[0] : pushname;
+
+  // ✅ Only handle group messages
+  if (!isGroup) return;
+
+  // Initialize group if not exist
+  if (!groupStats[m.chat]) {
+    groupStats[m.chat] = {
+      groupName: chatName,
+      totalMessages: 0,
+      members: {}
+    };
   }
 
-  // ✅ Cleaner and dynamic name resolution
-  const chatName = chatType === "Group"
-    ? (groupMeta?.subject || "Unknown Group")
-    : pushname;
+  const groupData = groupStats[m.chat];
 
-  // ✅ Initialize group stats only for groups
-  if (isGroup) {
-    if (!groupStats[m.chat]) {
-      groupStats[m.chat] = {
-        groupName: chatName,
-        totalMessages: 0,
-        members: {}
-      };
-    }
-
-    const groupData = groupStats[m.chat];
-
-    // Refresh group name if changed
-    if (groupData.groupName !== chatName) {
-      groupData.groupName = chatName;
-    }
-
-    // Track member stats
-    if (!groupData.members[senderId]) {
-      groupData.members[senderId] = {
-        name: pushname,
-        messages: 0,
-        lastMessage: null
-      };
-    }
-
-    groupData.totalMessages++;
-    groupData.members[senderId].messages++;
-    groupData.members[senderId].lastMessage = new Date().toISOString();
-    saveStats();
+  // Update name if it changes (optional)
+  if (groupData.groupName !== chatName) {
+    groupData.groupName = chatName;
   }
+
+  // Initialize user if not exist
+  if (!groupData.members[senderId]) {
+    groupData.members[senderId] = {
+      name: pushname,
+      messages: 0,
+      lastMessage: null
+    };
+  }
+
+  // Increment counters
+  groupData.totalMessages++;
+  groupData.members[senderId].messages++;
+  groupData.members[senderId].lastMessage = new Date().toISOString();
+
+  saveStats();
 });
 
 trashcore.ev.on('group-participants.update', async (update) => {

@@ -218,23 +218,7 @@ trashcore.ev.on('messages.upsert', async chatUpdate => {
             }
     })
     
- 
-const initAntiViewOnce = require('./antiviewonce'); // ✅ make sure the filename matches exactly
 
-trashcore.ev.on('connection.update', async (update) => {
-  try {
-    const { connection } = update;
-
-    if (connection === 'open') {
-      // Initialize AntiViewOnce when WhatsApp is connected
-      await initAntiViewOnce(trashcore);
-
-      console.log('✅ AntiViewOnce is fully active.');
-    }
-  } catch (error) {
-    console.error('❌ Error while initializing AntiViewOnce:', error);
-  }
-});
           
 trashcore.getName = async (jid) => {
   try {

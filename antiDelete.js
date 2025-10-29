@@ -152,22 +152,10 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
         return;
       }
 
-const sentBy = saved.key?.participant || saved.chat;
-const deletedBy = revokedKey.participant || botNumber; // who deleted the message
-
-const sentByFormatted = `@${sentBy.split('@')[0]}`;
-const deletedByFormatted = `@${deletedBy.split('@')[0]}`;
-
-// Build the header
-const header = `🛡️ *Anti-Delete*\nChat: ${chat.endsWith('@g.us') ? groupName : 'Private Chat'}\nSent by: ${sentByFormatted}\nDeleted by: ${deletedByFormatted}`;
-
-// For text messages
-if (saved.type === 'text') {
-  await trashcore.sendMessage(botNumber, {
-    text: `${header}\n\nDeleted Message:\n${saved.text}`,
-    mentions: [sentBy]
-  });
-}
+      const senderJid = saved.sender || 'unknown@s.whatsapp.net';
+      const userTag = `@${senderJid.split('@')[0]}`;
+      const mention = [senderJid];
+      const header = `🛡️ *Anti-Delete*\nGroup: ${groupName}\nUser: ${userTag}`;
 
       // Text messages
       if (saved.type === 'text') {

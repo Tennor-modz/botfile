@@ -238,10 +238,8 @@ trashcore.getName = async (jid) => {
     return jid.split('@')[0];
   }
 };
-// Path to groupStats.json
-const statsPath = path.join(__dirname, "library/groupStats.json");
 
-// Ensure the file exists
+const statsPath = path.join(__dirname, "library/groupStats.json");
 if (!fs.existsSync(statsPath)) {
   fs.writeFileSync(statsPath, JSON.stringify({}, null, 2));
 }
@@ -255,63 +253,78 @@ try {
   groupStats = {};
 }
 
+// 🔁 Debounce file writes (avoid saving every single message)
+let saveTimeout;
+function saveStats() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    try {
+      fs.writeFileSync(statsPath, JSON.stringify(groupStats, null, 2));
+    } catch (err) {
+      console.error("❌ Failed to save group stats:", err);
+    }
+  }, 5000);
+}
+
 trashcore.ev.on("messages.upsert", async ({ messages }) => {
   const m = messages[0];
-  if (!m.message) return; // Ignore system or undefined events
-  if (m.key.fromMe) return; // Skip your bot’s own messages
+  if (!m.message) return; 
+  if (m.key.fromMe) return; 
 
-  const from = m.key.remoteJid;
+  // ✅ Define m.chat safely for convenience
+  m.chat = m.key.remoteJid;
+
+  const from = m.chat;
   const senderId = m.key.participant || from;
   const pushname = m.pushName || "Unknown";
 
   // Track only group messages
   if (!from.endsWith("@g.us")) return;
 
-  // ✅ Fetch group metadata to get real name
-  let groupName = "Unknown";
-  try {
-    const metadata = await trashcore.groupMetadata(from);
-    groupName = metadata?.subject || "Unknown";
-  } catch {
-  }
+  // ✅ Fetch group name only when new group appears
+  if (!groupStats[m.chat]) {
+    let groupName = "Unknown";
+    try {
+      const metadata = await trashcore.groupMetadata(m.chat);
+      groupName = metadata?.subject || "Unknown";
+    } catch (err) {
+      console.warn("⚠️ Could not fetch group metadata:", err.message);
+    }
 
-  // ✅ Initialize group if missing
-  if (!groupStats[from]) {
-    groupStats[from] = {
+    groupStats[m.chat] = {
       groupName,
       totalMessages: 0,
       members: {}
     };
-  } else {
-    if (
-      !groupStats[from].groupName ||
-      groupStats[from].groupName === "Unknown" ||
-      groupStats[from].groupName !== groupName
-    ) {
-      groupStats[from].groupName = groupName;
-    }
   }
 
+  const groupData = groupStats[m.chat];
+
+  // ✅ Update group name if it has changed
+  try {
+    const metadata = await trashcore.groupMetadata(m.chat);
+    const currentName = metadata?.subject || "Unknown";
+    if (groupData.groupName !== currentName) {
+      groupData.groupName = currentName;
+    }
+  } catch {}
+
   // ✅ Initialize user if missing
-  if (!groupStats[from].members[senderId]) {
-    groupStats[from].members[senderId] = {
+  if (!groupData.members[senderId]) {
+    groupData.members[senderId] = {
       name: pushname,
       messages: 0,
       lastMessage: null
     };
   }
 
-  // ✅ Increment counts
-  groupStats[from].totalMessages++;
-  groupStats[from].members[senderId].messages++;
-  groupStats[from].members[senderId].lastMessage = new Date().toISOString();
+  // ✅ Update counts
+  groupData.totalMessages++;
+  groupData.members[senderId].messages++;
+  groupData.members[senderId].lastMessage = new Date().toISOString();
 
-  // ✅ Write updated stats
-  try {
-    fs.writeFileSync(statsPath, JSON.stringify(groupStats, null, 2));
-  } catch (err) {
-    console.error("❌ Failed to save group stats:", err);
-  }
+  // ✅ Save data (debounced)
+  saveStats();
 });
 trashcore.ev.on('group-participants.update', async (update) => {
   try {

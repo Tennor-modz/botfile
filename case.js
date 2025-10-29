@@ -3252,9 +3252,9 @@ case 'toimage': {
     const fs = require('fs');
     const path = require('path');
     const { tmpdir } = require('os');
-    const sharp = require('sharp');
+    const webp = require('webp-converter');
 
-    // ✅ Get sticker message
+    // Get sticker message
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const stickerMsg = (quotedMsg && quotedMsg.stickerMessage) || m.message?.stickerMessage;
 
@@ -3264,21 +3264,27 @@ case 'toimage': {
 
     m.reply("🖼️ Converting sticker to image...");
 
-    // ✅ Download sticker
+    // Download sticker
     const stream = await downloadContentFromMessage(stickerMsg, 'sticker');
     let buffer = Buffer.from([]);
     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-    // ✅ Convert WebP to PNG using sharp
-    const outputPath = path.join(tmpdir(), `sticker_${Date.now()}.png`);
-    await sharp(buffer).png().toFile(outputPath);
+    // Save temp WebP file
+    const webpPath = path.join(tmpdir(), `sticker_${Date.now()}.webp`);
+    fs.writeFileSync(webpPath, buffer);
 
-    // ✅ Send converted image
-    const imageBuffer = fs.readFileSync(outputPath);
+    // Convert WebP to PNG
+    const pngPath = webpPath.replace('.webp', '.png');
+    await webp.dwebp(webpPath, pngPath, "-o"); // webp-converter method
+
+    // Send converted image
+    const imageBuffer = fs.readFileSync(pngPath);
     await trashcore.sendMessage(from, { image: imageBuffer }, { quoted: m });
 
-    // ✅ Cleanup
-    fs.unlinkSync(outputPath);
+    // Cleanup
+    fs.unlinkSync(webpPath);
+    fs.unlinkSync(pngPath);
+
     reply("✅ Sticker converted to image!");
   } catch (err) {
     console.error("❌ toimage error:", err);

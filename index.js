@@ -272,7 +272,7 @@ function saveStats() {
 // 🧩 Safe group metadata fetcher with retry
 async function getGroupMetaSafe(trashcore, jid, retries = 2) {
   try {
-    return await trashcore.groupMetadata(jid);
+    return await trashcore.groupMeta(jid);
   } catch (err) {
     if (retries > 0) {
       await new Promise((res) => setTimeout(res, 1000));

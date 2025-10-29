@@ -1,30 +1,47 @@
 // antiDelete.js
 const fs = require('fs');
 const path = require('path');
-const { generateWAMessageFromContent, proto, downloadContentFromMessage, prepareWAMessageMedia } = require('@whiskeysockets/baileys');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 module.exports = function initAntiDelete(trashcore, opts = {}) {
-  const DB_PATH = opts.dbPath || path.join(__dirname, './library/antidelete.json');
+  const LIB_DIR = path.join(__dirname, './library');
+  const DB_PATH = opts.dbPath || path.join(LIB_DIR, 'antidelete.json');
+  const STATE_PATH = path.join(LIB_DIR, 'antidelete_state.json');
   const MAX_CACHE = opts.maxCache || 500;
-  const enabled = typeof opts.enabled === 'boolean' ? opts.enabled : true;
 
-  // REQUIRED: bot number in international format without @s.whatsapp.net
-  const botNumber = opts.botNumber?.endsWith('@s.whatsapp.net') ? opts.botNumber : `${opts.botNumber}@s.whatsapp.net`;
+  // Ensure folders exist
+  fs.mkdirSync(LIB_DIR, { recursive: true });
+
+  // Default config
+  const defaultEnabled = typeof opts.enabled === 'boolean' ? opts.enabled : true;
+
+  // Load persistent feature state
+  let featureState = defaultEnabled;
+  try {
+    if (fs.existsSync(STATE_PATH)) {
+      const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+      featureState = !!state.enabled;
+    }
+  } catch (e) {
+    console.warn('antiDelete: failed to load state file, using default');
+  }
+
+  global.antiDeleteEnabled = featureState;
+
+  const botNumber = opts.botNumber?.endsWith('@s.whatsapp.net')
+    ? opts.botNumber
+    : `${opts.botNumber}@s.whatsapp.net`;
 
   const cache = new Map();
 
   // Ensure database file exists
-  try {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({}), 'utf8');
-  } catch (e) {
-    console.error('antiDelete: failed to create db path', e);
+  if (!fs.existsSync(DB_PATH)) {
+    fs.writeFileSync(DB_PATH, JSON.stringify({}, null, 2));
   }
 
-  // Load persisted cache metadata
-  let persisted = {};
+  // Load previous cache (metadata only)
   try {
-    persisted = JSON.parse(fs.readFileSync(DB_PATH, 'utf8') || '{}');
+    const persisted = JSON.parse(fs.readFileSync(DB_PATH, 'utf8') || '{}');
     for (const k of Object.keys(persisted)) cache.set(k, persisted[k]);
   } catch (e) {
     console.warn('antiDelete: no persisted db or parse failed', e);
@@ -34,13 +51,21 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
     try {
       const obj = {};
       for (const [k, v] of cache.entries()) {
-        const toStore = Object.assign({}, v);
-        delete toStore.contentBuffer;
-        obj[k] = toStore;
+        const store = { ...v };
+        delete store.contentBuffer;
+        obj[k] = store;
       }
-      fs.writeFileSync(DB_PATH, JSON.stringify(obj, null, 2), 'utf8');
+      fs.writeFileSync(DB_PATH, JSON.stringify(obj, null, 2));
     } catch (e) {
       console.error('antiDelete persist error', e);
+    }
+  }
+
+  function saveState(enabled) {
+    try {
+      fs.writeFileSync(STATE_PATH, JSON.stringify({ enabled }, null, 2));
+    } catch (e) {
+      console.error('antiDelete saveState error', e);
     }
   }
 
@@ -52,13 +77,13 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
 
   async function handleIncomingMessage(m) {
     try {
-      if (!enabled || !m?.message) return;
+      if (!global.antiDeleteEnabled || !m?.message) return;
 
       const chat = m.key.remoteJid;
       const id = m.key.id || `${chat}-${Date.now()}`;
       const cacheKey = `${chat}:${id}`;
 
-      // Text message
+      // TEXT MESSAGE
       if (m.message.conversation || m.message.extendedTextMessage) {
         const text = m.message.conversation || m.message.extendedTextMessage?.text || '';
         addToCache(cacheKey, {
@@ -72,7 +97,7 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
         return;
       }
 
-      // Media messages
+      // MEDIA MESSAGE
       const mediaNode =
         m.message.imageMessage ||
         m.message.videoMessage ||
@@ -91,7 +116,9 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
 
         const stream = await downloadContentFromMessage(
           mediaNode,
-          mediaType === 'document' ? (mediaNode.mimetype?.split('/')[0] || 'document') : mediaType
+          mediaType === 'document'
+            ? (mediaNode.mimetype?.split('/')[0] || 'document')
+            : mediaType
         );
 
         let buffer = Buffer.from([]);
@@ -105,14 +132,14 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
           timestamp: Date.now(),
           fileName: mediaNode.fileName || null,
           mimetype: mediaNode.mimetype || null,
-          size: buffer.length || null,
+          size: buffer.length,
           contentBuffer: buffer,
           caption: mediaNode.caption || null
         });
         return;
       }
 
-      // Other nodes
+      // OTHER MESSAGE TYPES
       addToCache(cacheKey, {
         id,
         chat,
@@ -129,10 +156,10 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
 
   async function handleProtocolMessage(m) {
     try {
-      if (!enabled || !m?.message?.protocolMessage) return;
+      if (!global.antiDeleteEnabled || !m?.message?.protocolMessage) return;
 
-      const proto = m.message.protocolMessage;
-      const revokedKey = proto.key;
+      const protoMsg = m.message.protocolMessage;
+      const revokedKey = protoMsg.key;
       if (!revokedKey) return;
 
       const chat = revokedKey.remoteJid || m.key.remoteJid;
@@ -140,34 +167,44 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
       const cacheKey = `${chat}:${revokedId}`;
       const saved = cache.get(cacheKey);
 
-      // Get group name if group
-      let groupName = chat;
-      if (chat.endsWith('@g.us')) {
-        const metadata = await trashcore.groupMetadata(chat).catch(() => ({}));
-        groupName = metadata?.subject || chat;
+      const isGroup = chat.endsWith('@g.us');
+      let chatName = chat;
+
+      if (isGroup) {
+        try {
+          const meta = await trashcore.groupMetadata(chat);
+          chatName = meta?.subject || chat;
+        } catch {
+          chatName = chat;
+        }
       }
 
       if (!saved) {
-        await trashcore.sendMessage(botNumber, { text: `⚠️ A deleted message was not found in cache in group: ${groupName}` });
+        await trashcore.sendMessage(botNumber, {
+          text: `⚠️ Deleted message not found in cache in ${isGroup ? 'group' : 'private chat'}: ${chatName}`
+        });
         return;
       }
 
       const senderJid = saved.sender || 'unknown@s.whatsapp.net';
       const userTag = `@${senderJid.split('@')[0]}`;
       const mention = [senderJid];
-      const header = `🛡️ *Anti-Delete*\nFrom: ${groupName}\nUser: ${userTag}`;
+      const header = `🛡️ *Anti-Delete*\nChat: ${chatName}\nUser: ${userTag}`;
+      const targetJid = botNumber;
 
-      // Text messages
+      // TEXT MESSAGE
       if (saved.type === 'text') {
-        await trashcore.sendMessage(botNumber, { text: `${header}\n\nDeleted message:\n${saved.text}`, mentions: mention });
+        await trashcore.sendMessage(targetJid, {
+          text: `${header}\n\nDeleted message:\n${saved.text}`,
+          mentions: mention
+        });
         return;
       }
 
-      // Media messages with downloadable support
-      if (['image','video','audio','sticker','document'].includes(saved.type)) {
-        let msgOptions = {};
-
-        switch(saved.type) {
+      // MEDIA MESSAGE
+      if (['image', 'video', 'audio', 'sticker', 'document'].includes(saved.type)) {
+        const msgOptions = {};
+        switch (saved.type) {
           case 'image': msgOptions.image = saved.contentBuffer; break;
           case 'video': msgOptions.video = saved.contentBuffer; break;
           case 'audio': msgOptions.audio = saved.contentBuffer; msgOptions.mimetype = saved.mimetype || 'audio/mpeg'; break;
@@ -175,24 +212,25 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
           case 'document': msgOptions.document = saved.contentBuffer; msgOptions.fileName = saved.fileName || 'file'; break;
         }
 
-        if (['image','video','document'].includes(saved.type)) {
+        if (['image', 'video', 'document'].includes(saved.type)) {
           msgOptions.caption = `${header}\nOriginal caption: ${saved.caption || '—'}`;
           msgOptions.contextInfo = { mentionedJid: mention };
         }
 
-        await trashcore.sendMessage(botNumber, msgOptions);
+        await trashcore.sendMessage(targetJid, msgOptions);
         return;
       }
 
-      // fallback
-      await trashcore.sendMessage(botNumber, { text: `${header}\n(Content type not supported)`, mentions: mention });
+      await trashcore.sendMessage(targetJid, {
+        text: `${header}\n(Content type not supported)`,
+        mentions: mention
+      });
 
     } catch (err) {
       console.error('antiDelete.handleProtocolMessage error:', err);
     }
   }
 
-  // Wire up event listener
   trashcore.ev.on('messages.upsert', async ({ messages }) => {
     for (const m of messages) {
       try {
@@ -206,6 +244,7 @@ module.exports = function initAntiDelete(trashcore, opts = {}) {
 
   return {
     clearCache: () => { cache.clear(); persist(); },
-    getCacheSize: () => cache.size
+    getCacheSize: () => cache.size,
+    saveState
   };
 };

@@ -345,6 +345,7 @@ case 'help': {
 • setmenuimage
 • setmenuvideo
 • setprefix
+• antidelete 
 • menu2
 • updatebot 
 
@@ -937,6 +938,26 @@ case 'encrypt': {
   } catch (err) {
     console.error('Error during encryption:', err);
     await reply(`❌ An error occurred: ${err.message || String(err)}`);
+  }
+  break;
+}
+            // ================= ANTIDELETE =================
+case 'antidelete': {
+  if (!isOwner) return reply('❌ Only the bot owner can use this command.');
+  if (!text) return reply('⚙️ Usage:\n.antidelete on / off');
+
+  if (text.toLowerCase() === 'on') {
+    global.antiDeleteEnabled = true;
+    const antiDeleteModule = require('./antiDelete');
+    if (antiDeleteModule.saveState) antiDeleteModule.saveState(true);
+    reply('✅ AntiDelete has been *enabled*! Deleted messages will now be recovered.');
+  } else if (text.toLowerCase() === 'off') {
+    global.antiDeleteEnabled = false;
+    const antiDeleteModule = require('./antiDelete');
+    if (antiDeleteModule.saveState) antiDeleteModule.saveState(false);
+    reply('❌ AntiDelete has been *disabled*! Deleted messages will no longer be recovered.');
+  } else {
+    reply('⚠️ Invalid option.\nUse `.antidelete on` or `.antidelete off`');
   }
   break;
 }
@@ -4021,15 +4042,16 @@ const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     }
     break;
 }
-// ================= COPILOT =================
+// ================= COPILOT ================
 case 'copilot': {
     try {
         if (!args[0]) return reply('⚠️ Please provide a query!\n\nExample:\n.copilot what is JavaScript?');
-        
+
         const query = encodeURIComponent(args.join(' '));
-        const response = await fetch(`https://api.nekolabs.my.id/ai/copilot?text=${query}`);
-        const data = await response.json();
-        
+        const url = `https://api.nekolabs.my.id/ai/copilot?text=${query}`;
+
+        const { data } = await axios.get(url);
+
         if (data?.result?.text) {
             await reply(data.result.text);
         } else {
@@ -4042,7 +4064,6 @@ case 'copilot': {
     }
     break;
 }
-
 // =================FANCY =================
 case 'fancy': {
     try {

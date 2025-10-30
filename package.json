@@ -1,0 +1,28 @@
+{
+  "name": "trashcore-baileys-bot",
+  "version": "3.0.0",
+  "description": "Trashcore WhatsApp Bot using Baileys with switch(command) handler and media tools",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "github:Tennor-modz/MD-Baileys",
+    "pino": "^8.0.0",
+    "axios": "^0.27.2",
+    "yt-search": "^2.10.4",
+    "api-dylux": "^1.8.5",
+    "dotenv": "^16.3.1",
+    "btch-downloader": "^4.0.15",
+    "node-fetch": "^3.3.2",
+    "node-webpmux": "^3.1.1",
+    "mime-types": "^2.1.35",
+    "fluent-ffmpeg": "^2.1.2",
+    "qrcode-terminal": "^0.12.0",
+    "fs-extra": "^11.1.1",
+    "webp-converter": "latest",
+    "js-confuser": "^1.7.3",
+    "node-upload-images": "latest",
+    "jimp":"latest"
+  }
+}

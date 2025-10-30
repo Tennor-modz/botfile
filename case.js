@@ -332,6 +332,8 @@ if (!trashcore.isPublic && !isOwner) {
 
   break;
 }
+
+
             // ================= ALIVE =================
 case 'alive': {
   const axios = require('axios');
@@ -495,6 +497,7 @@ case 'help': {
 • playdoc
 • mediafire 
 • waifu
+• shazam
 
 👥 GROUP
 • add
@@ -1461,14 +1464,10 @@ case 'tourl': {
       m.message?.videoMessage ||
       m.message?.audioMessage;
 
-    if (!msg) {
-      return reply(`⚠️ Reply to an *image*, *video*, or *audio* with caption *${command}*`);
-    }
+    if (!msg) return reply(`⚠️ Reply to an *image*, *video*, or *audio* with caption *${command}*`);
 
     const mime = msg.mimetype || '';
-    if (!/image|video|audio/.test(mime)) {
-      return reply(`⚠️ Only works on *image*, *video*, or *audio* messages!`);
-    }
+    if (!/image|video|audio/.test(mime)) return reply(`⚠️ Only works on *image*, *video*, or *audio* messages!`);
 
     // ⏳ Optional duration check for long videos
     if (msg.videoMessage && msg.videoMessage.seconds > 300) {
@@ -1483,7 +1482,9 @@ case 'tourl': {
     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
     // 💾 Save temporary file
-    const ext = mime.split('/')[1] || 'bin';
+    let ext = mime.split('/')[1] || 'bin';
+    if (mime.startsWith('audio/')) ext = 'mp3'; // Force .mp3 for audio
+
     const tmpFile = path.join(tmpdir(), `upload_${Date.now()}.${ext}`);
     fs.writeFileSync(tmpFile, buffer);
 
@@ -1499,7 +1500,7 @@ case 'tourl': {
     const url = res.data?.trim();
     if (!url || !url.startsWith('https')) throw new Error("Upload failed or invalid response");
 
-    // 💬 Interactive nativeFlow message
+    // 💬 Send interactive nativeFlow message
     const msgContent = generateWAMessageFromContent(m.chat, {
       viewOnceMessage: {
         message: {
@@ -1543,6 +1544,78 @@ case 'tourl': {
   }
   break;
 }
+// =================SHAZZAM=================
+case 'shazam': {
+  try {
+    const axios = require('axios');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+    const FormData = require('form-data'); // ✅ Node-compatible FormData
+    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+
+    // Detect quoted audio or voice note
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg = (quotedMsg?.audioMessage || quotedMsg?.voiceMessage) || m.message?.audioMessage || m.message?.voiceMessage;
+    if (!msg) return reply("⚠️ Reply to a voice note or audio with this command!");
+
+    // Download audio
+    const stream = await downloadContentFromMessage(msg, 'audio');
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    // Save temporary file
+    const tmpFile = path.join(tmpdir(), `shazam_${Date.now()}.mp3`);
+    fs.writeFileSync(tmpFile, buffer);
+
+    reply("🎵 Recognizing song, please wait...");
+
+    // Send to AudD API
+    const auddApiKey = '7c1c26edbb767c35c81249555048c288'; // <-- Replace with your key
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(tmpFile));
+    formData.append('return', 'apple_music,spotify,deezer');
+    formData.append('api_token', auddApiKey);
+
+    const res = await axios.post('https://api.audd.io/', formData, {
+      headers: formData.getHeaders()
+    });
+
+    const result = res.data?.result;
+    if (!result) return reply("❌ Could not recognize the song!");
+
+    const title = result.title || 'Unknown';
+    const artist = result.artist || 'Unknown';
+    const album = result.album || 'Unknown';
+    const release = result.release_date || 'Unknown';
+    const apple = result.apple_music?.url || '';
+    const spotify = result.spotify?.external_urls?.spotify || '';
+    const deezer = result.deezer?.link || '';
+
+    let text = `🎶 *Song Recognized!*\n\n`;
+    text += `• *Title:* ${title}\n`;
+    text += `• *Artist:* ${artist}\n`;
+    text += `• *Album:* ${album}\n`;
+    text += `• *Release:* ${release}\n`;
+    if (apple) text += `• [Apple Music](${apple})\n`;
+    if (spotify) text += `• [Spotify](${spotify})\n`;
+    if (deezer) text += `• [Deezer](${deezer})\n`;
+
+    await trashcore.sendMessage(from, {
+      text,
+      jpegThumbnail: buffer // show audio thumbnail if possible
+    }, { quoted: m });
+
+    // Cleanup
+    fs.unlinkSync(tmpFile);
+
+  } catch (err) {
+    console.error(err);
+    reply(`💥 Error recognizing song: ${err.message}`);
+  }
+  break;
+}
+
 // =================TO VIDEO=================
 case 'tovid':
 case 'tovideo': {
@@ -3018,8 +3091,6 @@ async function getBuffer(url) {
                 }
                 break;
             }
-// ================= GET CASE  =================
-
 // ================= GET CASE  =================
 case 'getcase': {
 if (!isOwner) return reply("❌ Owner-only command.");

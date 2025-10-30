@@ -271,19 +271,139 @@ if (!trashcore.isPublic && !isOwner) {
     try {
         switch (command) {
             // ================= PING =================
-            case 'ping':
-            case 'alive': {
-                const start = Date.now();
-                await reply("⏳ Pinging...");
-                const end = Date.now();
-                const latency = end - start;
-                await reply(`Pong!
- Latency: ${latency}ms
-Uptime: ${formatUptime(process.uptime())}
- Owner: Trashcore`);
-                break;
-            }
+            case 'ping': {
+  const axios = require('axios');
+  const start = Date.now();
 
+  // Temporary reply
+  const temp = await reply('🏓 Checking connection...');
+
+  const latency = Date.now() - start;
+
+  // 🧠 Get random quote
+  let quoteText = "Keep pushing forward.";
+  let quoteAuthor = "Unknown";
+  try {
+    const res = await axios.get('https://zenquotes.io/api/random');
+    if (Array.isArray(res.data) && res.data[0]) {
+      quoteText = res.data[0].q;
+      quoteAuthor = res.data[0].a;
+    }
+  } catch (err) {
+    console.log("⚠️ Quote fetch failed:", err.message);
+  }
+
+  // 🕒 Uptime
+  const uptime = process.uptime();
+  const uptimeString = new Date(uptime * 1000).toISOString().substr(11, 8);
+
+  // 🎨 Random thumbnails
+  const thumbnails = [
+    "https://files.catbox.moe/00vqy4.jpg",
+    "https://files.catbox.moe/9xccze.jpg",
+    "https://files.catbox.moe/gbzodf.jpgg",
+    "https://files.catbox.moe/vclvso.jpg",
+    "https://files.catbox.moe/6dcjfv.jpg",
+    "https://files.catbox.moe/ruq73j.jpg",
+    "https://files.catbox.moe/v46fyx.jpg"
+  ];
+  const thumbnailUrl = thumbnails[Math.floor(Math.random() * thumbnails.length)];
+
+  // 📄 Message body
+  const msg = `
+*🏓 Pong!*
+> *Speed:* ${latency}ms  
+> *Uptime:* ${uptimeString}
+
+🧠 *Quote of the Day:*  
+> “${quoteText}”  
+> — ${quoteAuthor}
+`;
+
+  // 🖼️ Send result
+  await trashcore.sendMessage(
+    m.chat,
+    {
+      image: { url: thumbnailUrl },
+      caption: msg,
+    },
+    { quoted: m }
+  );
+
+  break;
+}
+            // ================= ALIVE =================
+case 'alive': {
+  const axios = require('axios');
+  const os = require('os');
+  const packageJson = require('./package.json'); 
+  const start = Date.now();
+  const temp = await reply('⚡ Checking bot status...');
+
+  const latency = Date.now() - start;
+  const uptime = process.uptime();
+  const uptimeString = new Date(uptime * 1000).toISOString().substr(11, 8);
+
+  // 💭 Fetch quote
+  let quoteText = "Keep grinding. Your dreams are valid.";
+  let quoteAuthor = "Unknown";
+  try {
+    const res = await axios.get('https://zenquotes.io/api/random');
+    if (Array.isArray(res.data) && res.data[0]) {
+      quoteText = res.data[0].q;
+      quoteAuthor = res.data[0].a;
+    }
+  } catch (err) {
+    console.warn("⚠️ Failed to fetch quote:", err.message);
+  }
+
+  // 🌆 Random thumbnail
+  const thumbnails = [
+    "https://files.catbox.moe/00vqy4.jpg",
+    "https://files.catbox.moe/9xccze.jpg",
+    "https://files.catbox.moe/gbzodf.jpgg",
+    "https://files.catbox.moe/vclvso.jpg",
+    "https://files.catbox.moe/6dcjfv.jpg",
+    "https://files.catbox.moe/ruq73j.jpg",
+    "https://files.catbox.moe/v46fyx.jpg"
+  ];
+  const thumb = thumbnails[Math.floor(Math.random() * thumbnails.length)];
+
+  // 📋 Bot info
+  const botName = "Trashcore Ultra";
+  const botVersion = packageJson.version || "3.0.0";
+  const ownerName = "Trashcore";
+
+  // 🧾 Message
+  const msg = `
+┏━━⟪ *🤖 ${botName} ALIVE* ⟫━━┓
+┃
+┃ 👑 *Owner:* ${ownerName}
+┃ 🧩 *Version:* ${botVersion}
+┃ ⏱️ *Uptime:* ${uptimeString}
+┃ ⚡ *Ping:* ${latency}ms
+┃ 💻 *Platform:* ${os.platform()} 
+┃
+┣━━━ *QUOTE OF THE DAY* ━━━┫
+┃ “${quoteText}”
+┃ — ${quoteAuthor}
+┃
+┗━━━━━━━━━━━━━━━━━━━━┛
+`;
+
+  // 🖼️ Send Alive Message
+  await trashcore.sendMessage(
+    m.chat,
+    {
+      image: { url: thumb },
+      caption: msg,
+      footer: `${botName} • Always Active 💫`,
+    },
+    { quoted: m }
+  );
+
+  break;
+}
             // ================= MENU =================
 case 'menu':
 case 'help': {
@@ -334,6 +454,7 @@ case 'help': {
 
 📊 SYSTEM
 • ping 
+• alive
 • public 
 • private 
 • autoread 
@@ -606,6 +727,7 @@ const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
     }
     break;
 }
+
 // ================= PINTEREST =================
 case 'scan': {
   try {

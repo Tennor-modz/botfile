@@ -127,32 +127,23 @@ async function starttrashcore() {
       log.success(`Bot connected as ${chalk.green(botNumber)}`);
       try { rl.close(); } catch (e) {}
 
-      // Send DM to paired number
+      // ✅ Send DM to paired number after successful pairing
 setTimeout(async () => {
-  const axios = require("axios");
-  const ownerJid = `${botNumber}@s.whatsapp.net`;
-  const message = `
-╭─TRASHCORE-ULTRA
+  try {
+    const ownerJid = `${botNumber}@s.whatsapp.net`; // Create full JID
+
+    const message = `
+╭─『 TRASHCORE-ULTRA 』
 ┃➥ Connected: ✅
-┃➥ Developer: Trashcore 
+┃➥ Developer: Trashcore
 ┃➥ Version: Ultra
-┃➥ ${botNumber}
-╰─────────
+┃➥ Number: ${botNumber}
+╰───────────────
 `;
 
-  try {
     await trashcore.sendMessage(ownerJid, { text: message });
-    const audioUrl = "https://files.catbox.moe/coej4a.mp3"; 
-    const { data } = await axios.get(audioUrl, { responseType: "arraybuffer" });
-    await trashcore.sendMessage(ownerJid, {
-      audio: Buffer.from(data),
-      mimetype: "audio/mpeg",
-      ptt: false
-    });
-
-    log.success(`✅ Sent DM + Audio from URL to paired number (${botNumber})`);
-  } catch (err) {
-    log.error(`❌ Failed to send DM or Audio: ${err}`);
+  } catch (error) {
+    console.error("❌ Failed to send DM:", error);
   }
 }, 2000);
                  try {

@@ -508,6 +508,7 @@ case 'help': {
 • antidelete 
 • menu2
 • updatebot 
+• update-termux
 
 🥁 ANALYSIS 
 • weather 
@@ -535,6 +536,7 @@ case 'help': {
 • mediafire 
 • waifu
 • shazam
+• pindl
 
 👥 GROUP
 • add
@@ -767,7 +769,113 @@ const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
     }
     break;
 }
+// =================Termux update=================
+case 'update-termux': {
+  if (!isOwner) return reply("❌ Owner-only command!");
+  const { exec } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
+  const https = require('https');
+  const { rmSync } = require('fs');
+  const settings = require('./config');
 
+  const run = (cmd) => new Promise((resolve, reject) => {
+    exec(cmd, (err, stdout, stderr) => {
+      if (err) return reject(stderr || err?.message || err);
+      resolve(stdout.toString());
+    });
+  });
+
+  const hasGitRepo = () => fs.existsSync(path.join(process.cwd(), '.git'));
+
+  const downloadFile = (url, dest) => new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    const client = url.startsWith('https') ? https : require('http');
+    client.get(url, (res) => {
+      if (res.statusCode !== 200) return reject(`HTTP ${res.statusCode}`);
+      res.pipe(file);
+      file.on('finish', () => file.close(resolve));
+      file.on('error', err => reject(err));
+    }).on('error', reject);
+  });
+
+  const extractZip = async (zipPath, outDir) => {
+    try {
+      await run('unzip -o ' + zipPath + ' -d ' + outDir);
+    } catch {
+      throw new Error("No unzip tool found");
+    }
+  };
+
+  const copyRecursive = (src, dest, ignore = []) => {
+    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src)) {
+      if (ignore.includes(entry)) continue;
+      const s = path.join(src, entry);
+      const d = path.join(dest, entry);
+      const stat = fs.lstatSync(s);
+      if (stat.isDirectory()) copyRecursive(s, d, ignore);
+      else fs.copyFileSync(s, d);
+    }
+  };
+
+  const updateViaGit = async () => {
+    await run('git fetch --all --prune');
+    await run('git reset --hard origin/main');
+    await run('git clean -fd');
+  };
+
+  const updateViaZip = async () => {
+    const zipUrl = settings.updateZipUrl || process.env.UPDATE_ZIP_URL;
+    if (!zipUrl) throw new Error("No ZIP URL configured");
+    const tmpDir = path.join(process.cwd(), 'tmp');
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
+    const zipPath = path.join(tmpDir, 'update.zip');
+    await downloadFile(zipUrl, zipPath);
+    const extractDir = path.join(tmpDir, 'update_extract');
+    if (fs.existsSync(extractDir)) rmSync(extractDir, { recursive: true, force: true });
+    await extractZip(zipPath, extractDir);
+    copyRecursive(extractDir, process.cwd(), ['node_modules', '.git', 'session', 'tmp', 'data']);
+    rmSync(zipPath, { force: true });
+    rmSync(extractDir, { recursive: true, force: true });
+  };
+
+  const restartBot = async () => {
+    reply("♻️ Restarting bot...");
+    try {
+      // Delete old session files if any
+      const sessionPath = path.join(process.cwd(), 'session');
+      if (fs.existsSync(sessionPath)) rmSync(sessionPath, { recursive: true, force: true });
+      // Stop bot
+      await run('pkill -f "node index.js"'); 
+      // Restart bot
+      exec('node index.js &', (err) => { if(err) console.error(err) });
+    } catch (e) {
+      console.error("Restart error:", e);
+    }
+  };
+
+  try {
+    reply("🛠️ Updating bot... please wait.");
+
+    if (hasGitRepo()) {
+      await updateViaGit();
+      await run('npm install --no-audit --no-fund');
+      reply("✅ Bot updated via Git!");
+    } else {
+      await updateViaZip();
+      await run('npm install --no-audit --no-fund');
+      reply("✅ Bot updated via ZIP!");
+    }
+
+    await restartBot();
+
+  } catch (err) {
+    console.error("Update Error:", err);
+    reply(`💥 Update failed:\n${err.message}`);
+  }
+}
+break;
 // ================= PINTEREST =================
 case 'scan': {
   try {
@@ -830,7 +938,65 @@ const fs = require('fs');
   }
   break;
 }
+// ================= PINDL =================
+case 'pindl': {
+  try {
+    const axios = require("axios");
+    if (!args[0]) return reply('*Example :* .pindl https://pin.it/57IghwKl0');
 
+    const url = args[0];
+
+    // Function to fetch Pin media
+    async function anakbaik(url) {
+      try {
+        const { data } = await axios.get(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile Safari/604.1"
+          },
+          maxRedirects: 5
+        });
+
+        const video = data.match(/"contentUrl":"(https:\/\/v1\.pinimg\.com\/videos\/[^\"]+\.mp4)"/);
+        const image = data.match(/"imageSpec_736x":\{"url":"(https:\/\/i\.pinimg\.com\/736x\/[^\"]+\.(?:jpg|jpeg|png|webp))"/) 
+                      || data.match(/"imageSpec_564x":\{"url":"(https:\/\/i\.pinimg\.com\/564x\/[^\"]+\.(?:jpg|jpeg|png|webp))"/);
+        const thumb = data.match(/"thumbnail":"(https:\/\/i\.pinimg\.com\/videos\/thumbnails\/originals\/[^\"]+\.jpg)"/);
+        const title = data.match(/"name":"([^"]+)"/);
+        const author = data.match(/"fullName":"([^"]+)".+?"username":"([^"]+)"/);
+        const date = data.match(/"uploadDate":"([^"]+)"/);
+        const keyword = data.match(/"keywords":"([^"]+)"/);
+
+        return {
+          type: video ? "video" : "image",
+          title: title ? title[1] : "-",
+          author: author ? author[1] : "-",
+          username: author ? author[2] : "-",
+          media: video ? video[1] : image ? image[1] : "-",
+          thumbnail: thumb ? thumb[1] : "-",
+          uploadDate: date ? date[1] : "-",
+          keywords: keyword ? keyword[1].split(",").map(x => x.trim()) : []
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+
+    // Fetch the media
+    const res = await anakbaik(url);
+    if (res.error) return reply(`💥 Error: ${res.error}`);
+
+    // Send video or image
+    if (res.type === 'video') {
+      await trashcore.sendMessage(from, { video: { url: res.media }, caption: `🎬 *${res.title}* by ${res.author}` }, { quoted: m });
+    } else {
+      await trashcore.sendMessage(from, { image: { url: res.media }, caption: `🖼️ *${res.title}* by ${res.author}` }, { quoted: m });
+    }
+
+  } catch (err) {
+    console.error(err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
 // ================= UPDATE =================
 case 'updatebot': {
   if (!isOwner) return reply("❌ Owner-only command!");

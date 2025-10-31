@@ -270,6 +270,43 @@ if (!trashcore.isPublic && !isOwner) {
 }
     try {
         switch (command) {
+        // ================= BOTINFO =================
+case 'botinfo': {
+  try {
+    const caption = `
+🤖 *TRASHCORE BOT INFO PANEL* ⚙️
+
+Welcome to the control center.
+Choose what you'd like to check ⬇️
+`;
+
+    const sections = [
+      {
+        title: "📡 Bot Information Menu",
+        rows: [
+          { title: "⚡ Ping", rowId: ".ping" },
+          { title: "💠 Alive", rowId: ".alive" },
+          { title: "🧭 Main Menu", rowId: ".menu" }
+        ]
+      }
+    ];
+
+    const listMessage = {
+      text: caption,
+      footer: "⚡ Powered by Trashcore",
+      title: "🧭 Bot Info Options",
+      buttonText: "Open Options 📂",
+      sections
+    };
+
+    await trashcore.sendMessage(from, listMessage, { quoted: m });
+
+  } catch (err) {
+    console.error("botinfo error:", err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
             // ================= PING =================
             case 'ping': {
   const axios = require('axios');

@@ -776,37 +776,48 @@ case 'update-termux': {
   const fs = require('fs');
   const path = require('path');
   const https = require('https');
+  const http = require('http');
   const { rmSync } = require('fs');
   const settings = require('./config');
 
+  // Helper to run shell commands
   const run = (cmd) => new Promise((resolve, reject) => {
-    exec(cmd, (err, stdout, stderr) => {
-      if (err) return reject(stderr || err?.message || err);
+    exec(cmd, { windowsHide: true }, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || stdout || err.message));
       resolve(stdout.toString());
     });
   });
 
-  const hasGitRepo = () => fs.existsSync(path.join(process.cwd(), '.git'));
+  // Check if current folder is a Git repo
+  const hasGitRepo = async () => {
+    const gitDir = path.join(process.cwd(), '.git');
+    return fs.existsSync(gitDir);
+  };
 
-  const downloadFile = (url, dest) => new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    const client = url.startsWith('https') ? https : require('http');
-    client.get(url, (res) => {
-      if (res.statusCode !== 200) return reject(`HTTP ${res.statusCode}`);
+  // Download file with redirect support
+  const downloadFile = (url, dest, visited = new Set()) => new Promise((resolve, reject) => {
+    if (visited.has(url) || visited.size > 5) return reject(new Error('Too many redirects'));
+    visited.add(url);
+    const client = url.startsWith('https://') ? https : http;
+    client.get(url, res => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
+        const nextUrl = new URL(res.headers.location, url).toString();
+        return downloadFile(nextUrl, dest, visited).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+      const file = fs.createWriteStream(dest);
       res.pipe(file);
       file.on('finish', () => file.close(resolve));
       file.on('error', err => reject(err));
     }).on('error', reject);
   });
 
+  // Extract ZIP
   const extractZip = async (zipPath, outDir) => {
-    try {
-      await run('unzip -o ' + zipPath + ' -d ' + outDir);
-    } catch {
-      throw new Error("No unzip tool found");
-    }
+    await run(`unzip -o '${zipPath}' -d '${outDir}'`);
   };
 
+  // Copy recursively
   const copyRecursive = (src, dest, ignore = []) => {
     if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
     for (const entry of fs.readdirSync(src)) {
@@ -819,60 +830,51 @@ case 'update-termux': {
     }
   };
 
+  // Git update
   const updateViaGit = async () => {
     await run('git fetch --all --prune');
     await run('git reset --hard origin/main');
     await run('git clean -fd');
   };
 
+  // ZIP update fallback
   const updateViaZip = async () => {
     const zipUrl = settings.updateZipUrl || process.env.UPDATE_ZIP_URL;
-    if (!zipUrl) throw new Error("No ZIP URL configured");
+    if (!zipUrl) throw new Error('No ZIP URL configured.');
     const tmpDir = path.join(process.cwd(), 'tmp');
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     const zipPath = path.join(tmpDir, 'update.zip');
     await downloadFile(zipUrl, zipPath);
-    const extractDir = path.join(tmpDir, 'update_extract');
-    if (fs.existsSync(extractDir)) rmSync(extractDir, { recursive: true, force: true });
-    await extractZip(zipPath, extractDir);
-    copyRecursive(extractDir, process.cwd(), ['node_modules', '.git', 'session', 'tmp', 'data']);
-    rmSync(zipPath, { force: true });
-    rmSync(extractDir, { recursive: true, force: true });
+    const extractTo = path.join(tmpDir, 'update_extract');
+    if (fs.existsSync(extractTo)) fs.rmSync(extractTo, { recursive: true, force: true });
+    await extractZip(zipPath, extractTo);
+    copyRecursive(extractTo, process.cwd(), ['node_modules', '.git', 'session', 'tmp', 'data']);
+    fs.rmSync(extractTo, { recursive: true, force: true });
+    fs.rmSync(zipPath, { force: true });
   };
 
+  // Restart bot safely in Termux
   const restartBot = async () => {
-    reply("♻️ Restarting bot...");
-    try {
-      // Delete old session files if any
-      const sessionPath = path.join(process.cwd(), 'session');
-      if (fs.existsSync(sessionPath)) rmSync(sessionPath, { recursive: true, force: true });
-      // Stop bot
-      await run('pkill -f "node index.js"'); 
-      // Restart bot
-      exec('node index.js &', (err) => { if(err) console.error(err) });
-    } catch (e) {
-      console.error("Restart error:", e);
-    }
+    try { process.exit(0); } catch { }
   };
 
   try {
-    reply("🛠️ Updating bot... please wait.");
+    await trashcore.sendMessage(m.chat, { text: "_Updating bot... please wait 🛠️_" }, { quoted: m });
 
-    if (hasGitRepo()) {
+    if (await hasGitRepo()) {
       await updateViaGit();
-      await run('npm install --no-audit --no-fund');
-      reply("✅ Bot updated via Git!");
+      reply("✅ Bot updated via Git successfully!");
     } else {
       await updateViaZip();
-      await run('npm install --no-audit --no-fund');
-      reply("✅ Bot updated via ZIP!");
+      reply("✅ Bot updated via ZIP successfully!");
     }
 
+    await trashcore.sendMessage(m.chat, { text: "_Restarting bot... 🚀_" }, { quoted: m });
     await restartBot();
 
   } catch (err) {
-    console.error("Update Error:", err);
-    reply(`💥 Update failed:\n${err.message}`);
+    console.error("UpdateBot Error:", err);
+    reply(`❌ Update failed:\n${err.message}`);
   }
 }
 break;

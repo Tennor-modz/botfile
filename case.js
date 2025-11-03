@@ -370,6 +370,77 @@ Choose what you'd like to check ⬇️
   break;
 }
 
+case 'test': {
+    try {
+        const menuMessage = {
+            location: {
+                degreesLatitude: 0,
+                degreesLongitude: 0,
+                name: "Trashcore",
+                jpegThumbnail: null // You can put a Buffer here if you want a thumbnail
+            },
+            caption: "🤖 *TRASHCORE BOT MENU*\n\nSelect an option below ⬇️",
+            footer: "Trashcore - Wa Bot",
+            buttons: [
+                {
+                    buttonId: 'action1',
+                    buttonText: { displayText: 'Main Menu' },
+                    type: 4,
+                    nativeFlowInfo: {
+                        name: 'single_select',
+                        paramsJson: JSON.stringify({
+                            title: "TRASHBOT - Main Menu",
+                            sections: [
+                                {
+                                    title: "Choose a command",
+                                    highlight_label: "",
+                                    rows: [
+                                        { title: "Convert", id: ".ping" },
+                                        { title: "Conversation", id: ".alive" },
+                                        { title: "Downloader", id: ".p" },
+                                        { title: "AI Menu", id: ".copilot" },
+                                        { title: "Group Menu", id: ".play" }
+                                    ]
+                                }
+                            ]
+                        })
+                    }
+                },
+                {
+                    buttonId: 'action2',
+                    buttonText: { displayText: 'Extras' },
+                    type: 4,
+                    nativeFlowInfo: {
+                        name: 'single_select',
+                        paramsJson: JSON.stringify({
+                            title: "TRASHBOT - Extras",
+                            sections: [
+                                {
+                                    title: "Extra Commands",
+                                    highlight_label: "",
+                                    rows: [
+                                        { title: "Test", id: ".ping" },
+                                        { title: "Alive", id: ".alive" },
+                                        { title: "Ping Again", id: ".ping2" }
+                                    ]
+                                }
+                            ]
+                        })
+                    }
+                }
+            ],
+            headerType: 6,
+            viewOnce: true
+        };
+
+        await trashcore.sendMessage(m.chat, menuMessage, { quoted: m });
+
+    } catch (err) {
+        console.error("menu error:", err);
+        reply(`💥 Error: ${err.message}`);
+    }
+    break;
+}
 
             // ================= ALIVE =================
 case 'alive': {
@@ -488,6 +559,7 @@ case 'help': {
 • Users: ${totalUsers}
 • Commands: ${totalCommands}
 • Server: ${host}
+• Local: trashcoreweb.zone.id
 
 |COMMANDS|
 
@@ -521,12 +593,12 @@ case 'help': {
 • ssweb
 • whois
 • scan
-• catphotos 
-• wormgpt 
+• catphotos
 
 🛟 MEDIA
 • tiktok
 • play
+• play2
 • song 
 • igdl
 • fb
@@ -535,8 +607,19 @@ case 'help': {
 • playdoc
 • mediafire 
 • waifu
+• hentai
 • shazam
 • pindl
+• spotify 
+• xvideos
+
+🤖ALS 
+• gpt
+• copilot
+• wormgpt 
+• llama
+• claude-al
+• qwen
 
 👥 GROUP
 • add
@@ -570,6 +653,7 @@ case 'help': {
 • tourl
 • tovideo 
 • readtext
+• web2zip
 
 🤠 DEVELOPER 
 • addcase
@@ -581,7 +665,6 @@ case 'help': {
 • getdep
 
 👤 BASIC
-• copilot
 • cat
 • vv
 • eval
@@ -598,7 +681,7 @@ if (mode === 'text') {
   await trashcore.sendMessage(from, { text: stylishReply(menuText) }, { quoted: m });
 } else if (mode === 'image') {
   await trashcore.sendMessage(from, {
-    image: { url: imageUrl || 'https://url.bwmxmd.online/Adams.tnn0fm6w.jpg' },
+    image: { url: imageUrl || 'https://files.catbox.moe/4pwhqd.jpeg' },
     caption: stylishReply(menuText)
   }, { quoted: m });
 } else if (mode === 'video') {
@@ -937,6 +1020,142 @@ const fs = require('fs');
   } catch (err) {
     console.error('Scan Error:', err);
     reply('💥 Failed to scan bot status!');
+  }
+  break;
+}
+// ================= Gpt =================
+case 'gpt': {
+  try {
+    const axios = require('axios');
+
+    if (!text) return reply("⚠️ Please provide a question or prompt.\n\nExample:\n.gpt What is quantum computing?");
+
+    const apiUrl = `https://api.nekolabs.web.id/ai/cf/gpt-oss-120b?text=${encodeURIComponent(text)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data.success || !data.result) {
+      return reply("💥 Could not get a response from the GPT API.");
+    }
+
+    // Handle both object and string results
+    const botReply =
+      typeof data.result === "string"
+        ? data.result
+        : JSON.stringify(data.result, null, 2);
+
+    await trashcore.sendMessage(from, {
+      text: `🤖 *GPT-OSS 120B says:*\n\n${botReply}`
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error("gpt error:", err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
+// ================= LLAMA =================
+case 'llama': {
+  try {
+    const axios = require('axios');
+
+    if (!text) return reply("⚠️ Please provide a question or prompt.\n\nExample:\n.llama What is artificial intelligence?");
+
+    const apiUrl = `https://api.nekolabs.web.id/ai/cf/llama-3.3-70b?text=${encodeURIComponent(text)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data.success || !data.result) {
+      return reply("💥 Could not get a response from the LLaMA API.");
+    }
+
+    const botReply = data.result;
+
+    await trashcore.sendMessage(from, {
+      text: `🦙 *LLaMA 3.3 AI says:*\n\n${botReply}`
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error("llama error:", err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
+// ================= QWEN-AL =================
+case 'qwen': {
+  try {
+    const axios = require('axios');
+
+    if (!text) return reply("⚠️ Please provide a question or prompt.\n\nExample:\n.qwen Write a simple JavaScript function");
+
+    const apiUrl = `https://api.nekolabs.web.id/ai/cf/qwen-2.5-coder-32b?text=${encodeURIComponent(text)}`;
+
+    const { data } = await axios.get(apiUrl);
+
+    if (!data.success || !data.result) {
+      return reply("💥 Could not get a valid response from Qwen API.");
+    }
+
+    await trashcore.sendMessage(from, { text: `🤖 *QWEN AI Response:*\n\n${data.result}` }, { quoted: m });
+
+  } catch (err) {
+    console.error("qwen error:", err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
+// ================= XVIDEOS =================
+case 'xvideos': {
+  try {
+    const axios = require('axios');
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+
+    if (!text) return reply("⚠️ Please provide an xvideos URL.\n\nExample:\n.xvideos https://www.xvideos.com/video123456");
+
+    const apiUrl = `https://api.nekolabs.web.id/downloader/xvideos?url=${encodeURIComponent(text)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data.success || !data.result?.videos) {
+      return reply("💥 Failed to fetch video info from API.");
+    }
+
+    const videoUrl = data.result.videos.high || data.result.videos.low;
+    if (!videoUrl) return reply("⚠️ Could not find a downloadable video link.");
+
+    const thumb = data.result.thumb;
+
+    // Temporary file path
+    const tmpFile = path.join(os.tmpdir(), `xvideos_${Date.now()}.mp4`);
+
+    // Download the video
+    const response = await axios({
+      url: videoUrl,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    const writer = fs.createWriteStream(tmpFile);
+    response.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    // Send video
+    await trashcore.sendMessage(from, {
+      video: fs.readFileSync(tmpFile),
+      caption: `🎬 *TRASHCORE XXX DOWNLOADER*\n\n📎 Source: xvideos.com\n⚡ Enjoy your video!`,
+      mimetype: 'video/mp4',
+      thumbnail: { url: thumb }
+    }, { quoted: m });
+
+    // Delete temporary file
+    fs.unlinkSync(tmpFile);
+
+  } catch (err) {
+    console.error("xvideos error:", err);
+    reply(`💥 Error: ${err.message}`);
   }
   break;
 }
@@ -1960,7 +2179,7 @@ case 'readtext': {
   }
   break;
 }
-// =================MEDIAFIRE=================
+// =================WAIFU=================
 case 'waifu': {
   try {
     const axios = require('axios');
@@ -1988,75 +2207,71 @@ case 'waifu': {
   }
   break;
 }
+// =================HENTAI=================
+case 'hentai': {
+  try {
+    const axios = require('axios');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+
+    // Download image as binary
+    const response = await axios.get('https://api.nekolabs.web.id/random/waifuim/hentai', {
+      responseType: 'arraybuffer'
+    });
+
+    const buffer = Buffer.from(response.data, 'binary');
+    const tmpFile = path.join(tmpdir(), `hentai_${Date.now()}.jpg`);
+    fs.writeFileSync(tmpFile, buffer);
+
+    // Send image
+    await trashcore.sendMessage(m.chat, { image: fs.readFileSync(tmpFile), caption: "🍑 Random Hentai Waifu" }, { quoted: m });
+
+    // Cleanup
+    fs.unlinkSync(tmpFile);
+  } catch (err) {
+    console.error('❌ Hentai Command Error:', err);
+    reply('❌ Failed to get hentai photo, try again later.');
+  }
+  break;
+}
 // =================MEDIAFIRE=================
 case 'mediafire': {
   try {
+    const axios = require('axios');
     const url = args[0];
-    if (!url) return reply('📎 Please provide a MediaFire link.\n\nExample:\n.mediafire https://www.mediafire.com/file/...');
+    if (!url) return reply('📎 Please provide a MediaFire link.\n\nExample: .mediafire https://www.mediafire.com/file/...');
 
-    await reply('⏳ Fetching MediaFire download info...');
+    await reply('⏳ Fetching MediaFire file info...');
 
-    const fetch = require('node-fetch');
-    const apiUrl = `https://api.dreaded.site/api/mediafiredl?url=${encodeURIComponent(url)}`;
+    const apiUrl = `https://api.nekolabs.web.id/downloader/mediafire?url=${encodeURIComponent(url)}`;
+    const { data } = await axios.get(apiUrl, { timeout: 20000 });
 
-    const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-
-    let data;
-    try {
-      data = await res.json();
-    } catch {
-      const text = await res.text();
-      data = { result: text };
+    if (!data?.success || !data.result) {
+      return reply('💥 Could not fetch the MediaFire file info.');
     }
 
-    const fileInfo = data.result || data.data || data.response || {};
-    const fileName = fileInfo.filename || fileInfo.name || 'unknown_file';
-    const fileSize = fileInfo.filesize || fileInfo.size || 'Unknown size';
-    const fileType = fileInfo.filetype || fileInfo.type || 'application/octet-stream';
-    const downloadUrl = fileInfo.link || fileInfo.url || fileInfo.download || null;
+    const fileInfo = data.result;
+    const downloadUrl = fileInfo.download_url;
+    const fileName = fileInfo.filename;
+    const fileSize = fileInfo.filesize;
+    const mimetype = fileInfo.mimetype || 'application/octet-stream';
 
-    if (!downloadUrl) return reply('⚠️ Failed to get the download link. Try another MediaFire URL.');
-
-    // Calculate approximate file size in MB
-    const sizeMatch = fileSize.match(/([\d.]+)\s*(MB|GB|KB)/i);
-    let sizeMB = 0;
-    if (sizeMatch) {
-      const num = parseFloat(sizeMatch[1]);
-      const unit = sizeMatch[2].toUpperCase();
-      sizeMB = unit === 'GB' ? num * 1024 : unit === 'KB' ? num / 1024 : num;
+    if (!downloadUrl) {
+      return reply('⚠️ Failed to get the download link. Try another MediaFire URL.');
     }
 
-    // If file is small enough (≤100MB), download and send as ZIP
-    if (sizeMB > 0 && sizeMB <= 100) {
-      await reply(`📦 Downloading *${fileName}* (${fileSize})...`);
-
-      const buffer = await fetch(downloadUrl).then(res => res.buffer());
-
-      // Rename the file as .zip (even if it’s an APK or other format)
-      const zipFileName = fileName.endsWith('.zip') ? fileName : `${fileName}.zip`;
-
-      await trashcore.sendMessage(from, {
-        document: buffer,
-        mimetype: 'application/zip',
-        fileName: zipFileName,
-        caption: `📁 *MediaFire File Saved*\n\n🧾 *Name:* ${zipFileName}\n📏 *Size:* ${fileSize}\n✅ Sent as ZIP.`,
-      }, { quoted: m });
-
-    } else {
-      await reply(
-        `📁 *MediaFire File Found!*\n\n` +
-        `🧾 *Name:* ${fileName}\n` +
-        `📏 *Size:* ${fileSize}\n` +
-        `⚙️ *Type:* ${fileType}\n\n` +
-        `🔗 *Download:* ${downloadUrl}\n\n` +
-        `_File too large to send directly, please download using the link above._`
-      );
-    }
+    // Send the file as a document
+    await trashcore.sendMessage(from, {
+      document: { url: downloadUrl },
+      fileName: fileName,
+      mimetype: mimetype,
+      caption: `📁 *MediaFire File*\n🧾 Name: ${fileName}\n📏 Size: ${fileSize}`
+    }, { quoted: m });
 
   } catch (err) {
-    console.error('MediaFire Command Error:', err);
-    await reply(`❌ Failed to process MediaFire link.\nError: ${err.message}`);
+    console.error('mediafire error:', err);
+    reply(`💥 Error: ${err.message}`);
   }
   break;
 }
@@ -3112,6 +3327,51 @@ case 'help2': {
   }
   break;
 }
+// ================= IGDL2 =================
+case 'igdl2': {
+  try {
+    const axios = require('axios');
+
+    if (!text) return reply(`⚠️ Usage: .igdl <Instagram post URL>\nExample: .igdl2 https://www.instagram.com/p/XXXXXXXXX/`);
+
+    await reply('📥 Fetching Instagram media...');
+
+    const apiUrl = `https://api.nekolabs.web.id/downloader/instagram?url=${encodeURIComponent(text)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data?.success || !data.result) {
+      return reply('💥 Could not fetch the media from Instagram.');
+    }
+
+    const { metadata, downloadUrl } = data.result;
+
+    // Prepare caption text
+    let captionText = `📸 *Instagram Post by:* ${metadata.username}\n❤️ Likes: ${metadata.like}\n💬 Comments: ${metadata.comment}\n\n${metadata.caption || ''}`;
+
+    // If video
+    if (metadata.isVideo && downloadUrl[0]) {
+      await trashcore.sendMessage(from, {
+        video: { url: downloadUrl[0] },
+        caption: captionText,
+        mimetype: 'video/mp4'
+      }, { quoted: m });
+    } 
+    // If images
+    else if (downloadUrl && Array.isArray(downloadUrl)) {
+      for (let img of downloadUrl) {
+        await trashcore.sendMessage(from, {
+          image: { url: img },
+          caption: captionText
+        }, { quoted: m });
+      }
+    }
+
+  } catch (err) {
+    console.error('igdl error:', err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
 // ================= SONG =================
 case 'song':
 case 'playmusic': {
@@ -3248,6 +3508,132 @@ async function getBuffer(url) {
         reply("❌ Failed to fetch the audio from the API.");
     }
     break;
+}
+
+            // ================= PLAY2 =================
+case 'play2': {
+  try {
+    const axios = require('axios');
+    const query = args.join(' ').trim();
+    if (!query) return reply(`⚠️ Usage: .play <song name>\nExample: .play2 Tiktoker by Goddy Tennor`);
+
+    await reply('🎶 Searching for your song...');
+
+    const apiUrl = `https://api.nekolabs.web.id/downloader/youtube/play/v1?q=${encodeURIComponent(query)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data?.success || !data.result) {
+      return reply('💥 Could not find the song.');
+    }
+
+    const song = data.result.metadata; // title, channel, duration, cover, url
+    const downloadUrl = data.result.downloadUrl;
+
+    const caption = `🎵 *${song.title}*\n👤 Channel: ${song.channel}\n⏱ Duration: ${song.duration}`;
+
+    // Send cover image + info
+    await trashcore.sendMessage(from, {
+      image: { url: song.cover },
+      caption,
+      footer: 'YouTube Downloader'
+    }, { quoted: m });
+
+    // Send audio
+    await trashcore.sendMessage(from, {
+      audio: { url: downloadUrl },
+      mimetype: 'audio/mpeg',
+      fileName: `${song.title}.mp3`
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error('play error:', err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
+            // ================= SPOTIFY =================
+case 'spotify': {
+  try {
+    const axios = require('axios');
+    const query = args.join(' ').trim();
+    if (!query) return reply(`⚠️ Usage: .spotify <song name>\nExample: .spotify Faded by Alan Walker`);
+
+    await reply('🎵 Searching for your Spotify track...');
+
+    const apiUrl = `https://api.nekolabs.web.id/downloader/spotify/play/v1?q=${encodeURIComponent(query)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data?.success || !data.result) {
+      return reply('💥 Could not find the track.');
+    }
+
+    const track = data.result.metadata;
+    const downloadUrl = data.result.downloadUrl;
+
+    const caption = `🎵 *${track.title}* by *${track.artist}*\n⏱ Duration: ${track.duration}`;
+
+    // Send track cover + info
+    await trashcore.sendMessage(from, {
+      image: { url: track.cover },
+      caption,
+      footer: 'Spotify Downloader'
+    }, { quoted: m });
+
+    // Send the audio file
+    await trashcore.sendMessage(from, {
+      audio: { url: downloadUrl },
+      mimetype: 'audio/mpeg',
+      fileName: `${track.title} - ${track.artist}.mp3`
+    }, { quoted: m });
+
+  } catch (err) {
+    console.error('spotify error:', err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
+            // ================= WEB2ZIP =================
+case 'web2zip': {
+  const axios = require("axios");
+  const fs = require("fs");
+  const path = require("path");
+
+  try {
+    if (!text) return reply("🌐 Please provide a website URL!\n\nExample:\n.web2zip https://trashcoreweb.zone.id");
+
+    const apiUrl = `https://api.nekolabs.web.id/tools/web2zip?url=${encodeURIComponent(text)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data.success || !data.result || !data.result.downloadUrl) {
+      return reply("❌ Could not generate ZIP file. Please check the website URL.");
+    }
+
+    const { url, copiedFilesAmount, downloadUrl } = data.result;
+    const zipPath = path.join(__dirname, "temp.zip");
+
+    // Notify user that download is starting
+    await reply(`📦 Generating ZIP from *${url}*...\nPlease wait, downloading...`);
+
+    // Download the ZIP file
+    const response = await axios.get(downloadUrl, { responseType: "arraybuffer" });
+    fs.writeFileSync(zipPath, response.data);
+
+    // Send ZIP as document
+    await trashcore.sendMessage(from, {
+      document: fs.readFileSync(zipPath),
+      mimetype: "application/zip",
+      fileName: `web_snapshot.zip`,
+      caption: `✅ *Website Archived Successfully!*\n\n🌍 *URL:* ${url}\n📂 *Files Saved:* ${copiedFilesAmount}\n🕓 *Processed by:* TRASHBOT`
+    }, { quoted: m });
+
+    // Clean up temporary file
+    fs.unlinkSync(zipPath);
+
+  } catch (err) {
+    console.error(err);
+    reply(`💥 Error: ${err.message}`);
+  }
+  break;
 }
             // ================= PLAY =================
             case 'play': {
@@ -3867,58 +4253,6 @@ case 'autorecord': {
   break;
 }
 
-case 'antibot': {
-  try {
-    if (!isGroup) return reply("⚠️ This command only works in groups!");
-    
-    const groupMeta = await trashcore.groupMetadata(from);
-    const groupAdmins = groupMeta.participants.filter(p => p.admin).map(p => p.id);
-    const isAdmin = groupAdmins.includes(sender);
-
-    if (!isAdmin) return reply("⚠️ Only group admins can run this command!");
-
-    await reply("🤖 Scanning group for suspected bot accounts...");
-
-    // Heuristic checks for bots
-    const suspectedBots = groupMeta.participants.filter(p => {
-      const hasBotInId = p.id.toLowerCase().includes('bot'); // id contains "bot"
-      const noProfilePic = !p.picture || p.picture === null; // no profile picture
-      const defaultStatus = !p.status || p.status === null; // default WhatsApp status
-      return hasBotInId || (noProfilePic && defaultStatus);
-    });
-
-    if (suspectedBots.length === 0) {
-      return reply("✅ No suspected bots detected in this group.");
-    }
-
-    // Warn first
-    let botListText = suspectedBots.map((b, i) => `${i + 1}. @${b.id.split('@')[0]}`).join('\n');
-    await trashcore.sendMessage(from, {
-      text: `⚠️ Suspected bot accounts detected:\n\n${botListText}\n\nThese accounts will be removed in 10 seconds.`,
-      mentions: suspectedBots.map(b => b.id)
-    });
-
-    // Wait 10 seconds for manual cancellation
-    await new Promise(res => setTimeout(res, 10000));
-
-    // Remove suspected bots
-    let removedCount = 0;
-    for (const bot of suspectedBots) {
-      try {
-        await trashcore.groupParticipantsUpdate(from, [bot.id], 'remove');
-        removedCount++;
-      } catch (err) {
-        console.error(`❌ Failed to remove ${bot.id}:`, err.message);
-      }
-    }
-
-    reply(`⚠️ Removed ${removedCount} suspected bot(s) from the group!`);
-  } catch (err) {
-    console.error("❌ antibot error:", err);
-    reply("💥 Failed to scan/remove bots. Make sure I'm an admin!");
-  }
-  break;
-}
 // ================= AUTOREAD =================
 case 'autoread': {
   try {
@@ -4652,28 +4986,17 @@ const { exec } = require("child_process");
 }
             // =================EVAL=================
 case 'eval': {
-    try {
-        if (!isOwner) return reply("❌ You are not authorized to use this command!");
-        if (!args[0]) return reply("⚠️ Please provide JavaScript code to evaluate.\n\nExample:\n.eval 2 + 2");
-
-        let code = args.join(" ");
-        let evaled;
-
-        try {
-            evaled = await eval(`(async () => { ${code} })()`);
-        } catch (err) {
-            return reply(`❌ *Eval Error:*\n\`\`\`${err.message}\`\`\``);
-        }
-
-        if (typeof evaled !== "string") evaled = require("util").inspect(evaled, { depth: 1 });
-
-        await reply(`✅ *Result:*\n\`\`\`${evaled}\`\`\``);
-    } catch (err) {
-        console.error("Eval command error:", err);
-        await reply(`❌ Unexpected error:\n${err.message}`);
-    }
-    break;
+  if (!isOwner) return;
+  if(!q) return;
+  try {
+    let evaled = await eval(q)
+    if (typeof evaled !== "string") evaled = require("util").inspect(evaled)
+    reply(evaled)
+  } catch (err) {
+    reply(String(err))
+  }
 }
+break
             // ================= OWNER ONLY COMMANDS =================
             default: {
                 if (!isOwner) break; // Only owner can use eval/exec

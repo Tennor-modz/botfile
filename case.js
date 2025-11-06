@@ -369,79 +369,6 @@ Choose what you'd like to check ⬇️
 
   break;
 }
-
-case 'test': {
-    try {
-        const menuMessage = {
-            location: {
-                degreesLatitude: 0,
-                degreesLongitude: 0,
-                name: "Trashcore",
-                jpegThumbnail: null // You can put a Buffer here if you want a thumbnail
-            },
-            caption: "🤖 *TRASHCORE BOT MENU*\n\nSelect an option below ⬇️",
-            footer: "Trashcore - Wa Bot",
-            buttons: [
-                {
-                    buttonId: 'action1',
-                    buttonText: { displayText: 'Main Menu' },
-                    type: 4,
-                    nativeFlowInfo: {
-                        name: 'single_select',
-                        paramsJson: JSON.stringify({
-                            title: "TRASHBOT - Main Menu",
-                            sections: [
-                                {
-                                    title: "Choose a command",
-                                    highlight_label: "",
-                                    rows: [
-                                        { title: "Convert", id: ".ping" },
-                                        { title: "Conversation", id: ".alive" },
-                                        { title: "Downloader", id: ".p" },
-                                        { title: "AI Menu", id: ".copilot" },
-                                        { title: "Group Menu", id: ".play" }
-                                    ]
-                                }
-                            ]
-                        })
-                    }
-                },
-                {
-                    buttonId: 'action2',
-                    buttonText: { displayText: 'Extras' },
-                    type: 4,
-                    nativeFlowInfo: {
-                        name: 'single_select',
-                        paramsJson: JSON.stringify({
-                            title: "TRASHBOT - Extras",
-                            sections: [
-                                {
-                                    title: "Extra Commands",
-                                    highlight_label: "",
-                                    rows: [
-                                        { title: "Test", id: ".ping" },
-                                        { title: "Alive", id: ".alive" },
-                                        { title: "Ping Again", id: ".ping2" }
-                                    ]
-                                }
-                            ]
-                        })
-                    }
-                }
-            ],
-            headerType: 6,
-            viewOnce: true
-        };
-
-        await trashcore.sendMessage(m.chat, menuMessage, { quoted: m });
-
-    } catch (err) {
-        console.error("menu error:", err);
-        reply(`💥 Error: ${err.message}`);
-    }
-    break;
-}
-
             // ================= ALIVE =================
 case 'alive': {
   const axios = require('axios');
@@ -559,7 +486,7 @@ case 'help': {
 • Users: ${totalUsers}
 • Commands: ${totalCommands}
 • Server: ${host}
-• Local: trashcoreweb.zone.id
+• Local: www.trashcorehub.zone.id
 
 |COMMANDS|
 
@@ -593,6 +520,7 @@ case 'help': {
 • ssweb
 • whois
 • scan
+• speed
 • catphotos
 
 🛟 MEDIA
@@ -651,9 +579,11 @@ case 'help': {
 • fancy
 • sticker 
 • tourl
+• url
 • tovideo 
 • readtext
 • web2zip
+• convert 
 
 🤠 DEVELOPER 
 • addcase
@@ -694,7 +624,43 @@ if (mode === 'text') {
 
   break;
 }
-   
+// ================= SPEED =================
+case 'speed': {
+  try {
+    const start = Date.now();
+
+    // Send looping "GIF-like" video
+    const videoUrl = 'https://files.catbox.moe/ezyv8w.mp4';
+    await trashcore.sendMessage(
+      m.chat,
+      {
+        video: { url: videoUrl },
+        gifPlayback: true,
+        caption: '🏓 *scanning...*',
+      },
+      { quoted: m }
+    );
+
+    const end = Date.now();
+    const ping = end - start;
+
+    // Send pong response
+    await reply(`✅ Pong!\n🕒 ULTRA BOTZ: ${ping}ms`);
+
+    // React to the original command message
+    await trashcore.sendMessage(m.chat, {
+      react: {
+        text: '⚡', // You can change emoji (e.g. '✅', '🔥', '💥')
+        key: m.key
+      }
+    });
+
+  } catch (err) {
+    console.error('❌ Ping Command Error:', err);
+    reply('❌ Failed to send ping video.');
+  }
+  break;
+}
 // ================= SETPREFIX =================
 case 'setprefix': {
     try {
@@ -1156,6 +1122,69 @@ case 'xvideos': {
   } catch (err) {
     console.error("xvideos error:", err);
     reply(`💥 Error: ${err.message}`);
+  }
+  break;
+}
+
+// ================= CONVERT =================
+case 'convert': {
+  try {
+    const input = text.trim();
+    if (!input)
+      return reply(
+        '⚙️ Usage:\n.convert plugin case <code>\n.convert case plugin <code>'
+      );
+
+    // Split into: convertTypeFrom, convertTypeTo, and code
+    const parts = input.split(' ');
+    const from = parts.shift();
+    const to = parts.shift();
+    const code = parts.join(' ').trim();
+
+    if (!from || !to || !code)
+      return reply(
+        '❗ Example:\n.convert plugin case <code>\n.convert case plugin <code>'
+      );
+
+    let result = '';
+
+    // --- Convert plugin ➜ case ---
+    if (from === 'plugin' && to === 'case') {
+      const cmdMatch = code.match(/handler\.command\s*=\s*\[(['"`])(.*?)\1\]/);
+      const commands = cmdMatch ? cmdMatch[2] : 'command';
+
+      const body = code
+        .replace(/let handler\s*=\s*async.*?=>\s*\{/, '')
+        .replace(/handler\.command.*?;/, '')
+        .replace(/export default handler/, '')
+        .replace(/\};?$/, '')
+        .trim();
+
+      result = `case '${commands}': {\n${body}\n  break;\n}`;
+    }
+
+    // --- Convert case ➜ plugin ---
+    else if (from === 'case' && to === 'plugin') {
+      const cmdMatch = code.match(/case\s+['"`](.*?)['"`]:/);
+      const command = cmdMatch ? cmdMatch[1] : 'command';
+
+      const body = code
+        .replace(/case\s+['"`].*?['"`]:\s*\{/, '')
+        .replace(/break;?\s*\}?$/, '')
+        .trim();
+
+      result = `let handler = async (m, { text, reply, trashcore }) => {\n${body}\n};\n\nhandler.command = ['${command}'];\nexport default handler;`;
+    } else {
+      return reply(
+        '❌ Invalid format.\nUse:\n.convert plugin case <code>\n.convert case plugin <code>'
+      );
+    }
+
+    // Send converted code
+    await reply(`✅ Code converted successfully!\n\n\`\`\`js\n${result}\n\`\`\``);
+  } catch (e) {
+    console.error(e);
+    reply('❌ Conversion failed: ' + e.message);
   }
   break;
 }
@@ -1968,6 +1997,103 @@ case 'tourl': {
   }
   break;
 }
+// =================URL=================
+case 'url': {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+    const axios = require('axios');
+    const FormData = require('form-data');
+    const { downloadContentFromMessage, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+
+    // Get quoted or direct media
+    const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg =
+      (quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage || quotedMsg.audioMessage)) ||
+      m.message?.imageMessage ||
+      m.message?.videoMessage ||
+      m.message?.audioMessage;
+
+    if (!msg) return reply(`⚠️ Reply to an *image*, *video*, or *audio* with caption *.tourl*`);
+
+    const mime = msg.mimetype || '';
+    if (!/image|video|audio/.test(mime)) return reply(`⚠️ Only works on *image*, *video*, or *audio* messages!`);
+
+    // Optional: max 5 min videos
+    if (msg.videoMessage && msg.videoMessage.seconds > 300) {
+      return reply("⚠️ Maximum video duration is *5 minutes*!");
+    }
+
+    reply("🔍 Scanning file...");
+    await new Promise(r => setTimeout(r, 1500));
+    reply("✅ Scan successful!\n📤 Uploading file...");
+
+    // Download media
+    const stream = await downloadContentFromMessage(msg, mime.split('/')[0]);
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+    // Save temporary file
+    let ext = mime.split('/')[1] || 'bin';
+    if (mime.startsWith('audio/')) ext = 'mp3';
+    const tmpFile = path.join(tmpdir(), `upload_${Date.now()}.${ext}`);
+    fs.writeFileSync(tmpFile, buffer);
+
+    // Upload to custom API
+    const form = new FormData();
+    form.append('file', fs.createReadStream(tmpFile));
+
+    const res = await axios.post('https://trashuploads.zone.id/api/upload', form, {
+      headers: form.getHeaders(),
+    });
+
+    const url = res.data?.url;
+    if (!url) throw new Error("Upload failed or invalid response");
+
+    const msgContent = generateWAMessageFromContent(m.chat, {
+      viewOnceMessage: {
+        message: {
+          messageContextInfo: {
+            deviceListMetadata: {},
+            deviceListMetadataVersion: 2
+          },
+          interactiveMessage: {
+            body: { text: `✅ Upload Successful!\n\n🔗 URL: ${url}` },
+            footer: { text: "📦 Uploaded by TrashBot" },
+            nativeFlowMessage: {
+              buttons: [
+                {
+                  name: "cta_copy",
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "📋 COPY LINK",
+                    copy_code: url
+                  })
+                },
+                {
+                  name: "cta_url",
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "🌍 OPEN LINK",
+                    url: url,
+                    merchant_url: url
+                  })
+                }
+              ]
+            }
+          }
+        }
+      }
+    }, { quoted: m });
+
+    await trashcore.relayMessage(m.chat, msgContent.message, { messageId: msgContent.key.id });
+    fs.unlinkSync(tmpFile);
+
+  } catch (err) {
+    console.error("💥 tourl error:", err);
+    reply(`💥 Failed to upload:\n${err.message}`);
+  }
+  break;
+}
 // =================SHAZZAM=================
 case 'shazam': {
   try {
@@ -2735,24 +2861,33 @@ case 'setgoodbye': {
 // =================SSWEB=================
 case 'ssweb': {
   try {
+    const axios = require('axios');
+    const fs = require('fs');
+    const path = require('path');
+    const { tmpdir } = require('os');
+
     const url = args[0];
-    if (!url) return reply('🌐 Please provide a valid URL.\nExample: .ssweb https://example.com');
+    if (!url) return reply('🌐 Please provide a valid URL.\n\nExample: *.ssweb https://example.com*');
 
     await reply('🖼️ Capturing screenshot, please wait...');
 
-    const fetch = require('node-fetch');
     const apiUrl = `https://api.zenzxz.my.id/api/tools/ssweb?url=${encodeURIComponent(url)}`;
 
-    // Fetch as binary (buffer), not JSON
-    const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const buffer = await res.buffer();
+    // Fetch screenshot as binary data
+    const res = await axios.get(apiUrl, { responseType: 'arraybuffer' });
 
-    // Send the image
+    // Save temporarily (optional, but safe for sending)
+    const tmpFile = path.join(tmpdir(), `ssweb_${Date.now()}.jpg`);
+    fs.writeFileSync(tmpFile, res.data);
+
+    // Send the image to the chat
     await trashcore.sendMessage(from, {
-      image: buffer,
+      image: fs.readFileSync(tmpFile),
       caption: `🖥️ *Screenshot of:* ${url}`,
     }, { quoted: m });
+
+    // Clean up temp file
+    fs.unlinkSync(tmpFile);
 
   } catch (err) {
     console.error('ssweb Command Error:', err);

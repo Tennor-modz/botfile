@@ -465,6 +465,12 @@ case 'help': {
     fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
   }
 
+const ownerFile = path.join(__dirname, 'library/owner.json');
+if (!fs.existsSync(ownerFile)) {
+    fs.writeFileSync(ownerFile, JSON.stringify({ name: 'not set' }, null, 2));
+}
+const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
+
   const caseFile = path.join(__dirname, 'case.js');
   const caseContent = fs.readFileSync(caseFile, 'utf8');
   const totalCommands = (caseContent.match(/case\s+['"`]/g) || []).length;
@@ -475,135 +481,140 @@ case 'help': {
   const totalUsers = users.length;
   const host = detectPlatform(); 
   const menuText = `
-👑 *Trashcore Bot*
+👑 ┃Trashcore Bot┃
+
+🧑 Owner: ${ownerName}
 📝 Type: Multi Device
-⚡ Version: 3.0.0
+⚡ Version: 3.5.0
 📦 Module: Case
 
-🧠 *Stats*
-• Uptime: ${uptimeFormatted}
-• RAM Usage: ${ramUsage} MB
-• Users: ${totalUsers}
-• Commands: ${totalCommands}
-• Server: ${host}
-• Local: www.trashcorehub.zone.id
+🧠 ┃Stats┃
+⭔ Uptime: ${uptimeFormatted}
+⭔ RAM Usage: ${ramUsage} MB
+⭔ Users: ${totalUsers}
+⭔ Commands: ${totalCommands}
+⭔ Server: ${host}
+⭔ Local: www.trashcorehub.zone.id
 
 |COMMANDS|
 
 📊 SYSTEM
-• ping 
-• alive
-• public 
-• private 
-• autoread 
-• autorecord 
-• autotyping 
-• checksettings 
-• setdp
-• setmenu
-• setmenuimage
-• setmenuvideo
-• setprefix
-• antidelete 
-• menu2
-• updatebot 
-• update-termux
+┃⭔ ping
+┃⭔ alive
+┃⭔ public
+┃⭔ private
+┃⭔ autoread
+┃⭔ autorecord
+┃⭔ autotyping
+┃⭔ checksettings
+┃⭔ setdp
+┃⭔ setmenu
+┃⭔ setname
+┃⭔ setmenuimage
+┃⭔ setmenuvideo
+┃⭔ setprefix
+┃⭔ antidelete
+┃⭔ menu2
+┃⭔ updatebot
+┃⭔ update-termux
 
-🥁 ANALYSIS 
-• weather 
-• checktime 
-• gitclone 
-• repo
-• fact
-• claude-al
-• gitstalk
-• ssweb
-• whois
-• scan
-• speed
-• catphotos
+📊 ANALYSIS
+┃⭔ weather
+┃⭔ checktime
+┃⭔ gitclone
+┃⭔ repo
+┃⭔ fact
+┃⭔ claude-al
+┃⭔ gitstalk
+┃⭔ ssweb
+┃⭔ whois
+┃⭔ scan
+┃⭔ speed
+┃⭔ catphotos
 
 🛟 MEDIA
-• tiktok
-• play
-• play2
-• song 
-• igdl
-• fb
-• video 
-• ytmp3 
-• playdoc
-• mediafire 
-• waifu
-• hentai
-• shazam
-• pindl
-• spotify 
-• xvideos
+┃⭔ tiktok
+┃⭔ play
+┃⭔ play2
+┃⭔ song
+┃⭔ igdl
+┃⭔ fb
+┃⭔ video
+┃⭔ ytmp3
+┃⭔ ytmp4
+┃⭔ playdoc
+┃⭔ mediafire
+┃⭔ sfile
+┃⭔ waifu
+┃⭔ hentai
+┃⭔ shazam
+┃⭔ pindl
+┃⭔ spotify
+┃⭔ xvideos
 
-🤖ALS 
-• gpt
-• copilot
-• wormgpt 
-• llama
-• claude-al
-• qwen
+🤖 AI / ALS
+┃⭔ gpt
+┃⭔ copilot
+┃⭔ wormgpt
+┃⭔ llama
+┃⭔ claude-al
+┃⭔ qwen
 
 👥 GROUP
-• add
-• kick
-• promote 
-• demote
-• antilink
-• antitag
-• antipromote 
-• antidemote 
-• antibadword 
-• tagall
-• hidetag
-• mute
-• unmute
-• setwelcome 
-• setgoodbye 
-• listactive 
-• listinactive 
+┃⭔ add
+┃⭔ kick
+┃⭔ promote
+┃⭔ demote
+┃⭔ antilink
+┃⭔ antitag
+┃⭔ antipromote
+┃⭔ antidemote
+┃⭔ antibadword
+┃⭔ tagall
+┃⭔ hidetag
+┃⭔ mute
+┃⭔ unmute
+┃⭔ setwelcome
+┃⭔ setgoodbye
+┃⭔ listactive
+┃⭔ listinactive
 
 📍 CONVERSION
-• toaudio 
-• tovoicenote 
-• toimage
-• fast
-• slow
-• bass
-• deep
-• fancy
-• sticker 
-• tourl
-• url
-• tovideo 
-• readtext
-• web2zip
-• convert 
+┃⭔ toaudio
+┃⭔ tovoicenote
+┃⭔ toimage
+┃⭔ fast
+┃⭔ slow
+┃⭔ bass
+┃⭔ deep
+┃⭔ fancy
+┃⭔ sticker
+┃⭔ tourl
+┃⭔ url
+┃⭔ tovideo
+┃⭔ readtext
+┃⭔ web2zip
+┃⭔ convert
 
-🤠 DEVELOPER 
-• addcase
-• addfile
-• delcase
-• delfile
-• restart 
-• getcase 
-• getdep
+🤠 DEVELOPER
+┃⭔ addcase
+┃⭔ addfile
+┃⭔ delcase
+┃⭔ delfile
+┃⭔ restart
+┃⭔ getcase
+┃⭔ getdep
 
-👤 BASIC
-• cat
-• vv
-• eval
-• enc
-• exec
-• ls
-• >
-• <
-• =>
+👤 UTILITY / BASIC
+┃⭔ cat
+┃⭔ vv
+┃⭔ eval
+┃⭔ enc
+┃⭔ exec
+┃⭔ ls
+┃⭔ >
+┃⭔ <
+┃⭔ =>
 `;
 
   // Send based on selected mode
@@ -663,6 +674,7 @@ case 'speed': {
 }
 // ================= SETPREFIX =================
 case 'setprefix': {
+  if (!isOwner) return reply("❌ Only the bot owner can use this command!");
     try {
         const fs = require('fs');
         const prefixSettingsPath = './library/prefixSettings.json';
@@ -1125,7 +1137,97 @@ case 'xvideos': {
   }
   break;
 }
+// ================= SETName =================
+case 'setname': {
+  if (!isOwner) return reply("❌ Owner-only command!");
+ const ownerFile = path.join(__dirname, 'library/owner.json');
+if (!fs.existsSync(ownerFile)) {
+    fs.writeFileSync(ownerFile, JSON.stringify({ name: 'not set' }, null, 2));
+}
+ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
+    if (!args[0]) return reply('⚠️ Please provide a name.\nExample: .setowner Trashcore');
+    const newName = args.join(' ');
+    fs.writeFileSync(ownerFile, JSON.stringify({ name: newName }, null, 2));
+    reply(`✅ Owner name updated to: ${newName}`);
+    break;
+}
+// ================= SFILE =================
+case 'sfile': {
+  try {
+ const cheerio = require('cheerio');
+ const axios = require('axios');
+ const mime = require('mime-types');
+    if (!args[0]) return m.reply('*Example :* .sfile https://sfile.mobi/2E5O1HMVKcc');
 
+    const sfile = {
+      createHeaders: referer => ({
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+        'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="137", "Google Chrome";v="137"',
+        'dnt': '1',
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-platform': '"Android"',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-dest': 'empty',
+        'Referer': referer,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }),
+      extractCookies: h => h['set-cookie']?.map(c => c.split(';')[0]).join('; ') || '',
+      extractMetadata: $ => {
+        const m = {};
+        $('.file-content').eq(0).each((_, e) => {
+          const x = $(e);
+          m.file_name = x.find('img').attr('alt');
+          m.mimetype = x.find('.list').eq(0).text().trim().split('-')[1].trim();
+          m.upload_date = x.find('.list').eq(2).text().trim().split(':')[1].trim();
+          m.download_count = x.find('.list').eq(3).text().trim().split(':')[1].trim();
+          m.author_name = x.find('.list').eq(1).find('a').text().trim();
+        });
+        return m;
+      },
+      makeRequest: async (u, o) => {
+        try { return await axios.get(u, o); }
+        catch (e) { if (e.response) return e.response; throw new Error(`Request gagal: ${e.message}`); }
+      },
+      download: async (url, resultBuffer = false) => {
+        try {
+          let h = sfile.createHeaders(url);
+          const init = await sfile.makeRequest(url, { headers: h });
+          const ck = sfile.extractCookies(init.headers);
+          h.Cookie = ck;
+          let $ = cheerio.load(init.data);
+          const meta = sfile.extractMetadata($);
+          const dl = $('#download').attr('href');
+          if (!dl) throw new Error('Download URL gak ketemu');
+          h.Referer = dl;
+          const proc = await sfile.makeRequest(dl, { headers: h });
+          const html = proc.data;
+          $ = cheerio.load(html);
+          const scr = $('script').map((i, el) => $(el).html()).get().join('\n');
+          const re = /https:\\\/\\\/download\d+\.sfile\.mobi\\\/downloadfile\\\/\d+\\\/\d+\\\/[a-z0-9]+\\\/[^\s'"]+\.[a-z0-9]+(\?[^"']+)?/gi;
+          const mt = scr.match(re);
+          if (!mt?.length) throw new Error('Link download final gak ketemu di script');
+          const fin = mt[0].replace(/\\\//g, '/');
+          let download;
+          if (resultBuffer) {
+            const file = await sfile.makeRequest(fin, { headers: h, responseType: 'arraybuffer' });
+            download = Buffer.from(file.data);
+          } else download = fin;
+          return { metadata: meta, download };
+        } catch (e) { throw new Error(`${e.message}`); }
+      }
+    };
+
+    const data = await sfile.download(args[0], true);
+    const { file_name, mimetype } = data.metadata;
+    const type = mime.lookup(file_name) || 'application/octet-stream';
+
+    await trashcore.sendMessage(m.chat, { document: data.download, fileName: file_name, mimetype: type }, { quoted: m });
+
+  } catch (e) { m.reply(e.message); }
+  break;
+}
 // ================= CONVERT =================
 case 'convert': {
   try {
@@ -1399,6 +1501,107 @@ case 'updatebot': {
   }
 }
 break;
+
+
+// ================= YTAxYTV =================
+case 'ytmp4':
+case 'ytmp3': {
+  try {
+    const { spawn } = require('child_process');
+    const fs = require('fs');
+    const axios = require('axios');
+
+    const yt = {
+      static: Object.freeze({
+        baseUrl: 'https://cnv.cx',
+        headers: {
+          'accept-encoding': 'gzip, deflate, br, zstd',
+          'origin': 'https://frame.y2meta-uk.com',
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0'
+        }
+      }),
+      log(m) { console.log(`[yt-skrep] ${m}`) },
+      resolveConverterPayload(link, f = '128k') {
+        const a = ['128k', '320k', '144p', '240p', '360p', '720p', '1080p'];
+        if (!a.includes(f)) throw Error(`invalid format. available: ${a.join(', ')}`);
+        const t = f.endsWith('k') ? 'mp3' : 'mp4';
+        const b = t === 'mp3' ? parseInt(f) + '' : '128';
+        const v = t === 'mp4' ? parseInt(f) + '' : '720';
+        return { link, format: t, audioBitrate: b, videoQuality: v, filenameStyle: 'pretty', vCodec: 'h264' };
+      },
+      sanitizeFileName(n) {
+        const e = n.match(/\.[^.]+$/)[0];
+        const f = n.replace(new RegExp(`\\${e}$`), '').replaceAll(/[^A-Za-z0-9]/g, '_').replace(/_+/g, '_').toLowerCase();
+        return f + e;
+      },
+      async getBuffer(u) {
+        const h = { ...this.static.headers, referer: 'https://v6.www-y2mate.com/', range: 'bytes=0-' };
+        delete h.origin;
+        const r = await axios.get(u, { headers: h, responseType: 'arraybuffer' });
+        if (r.status !== 200) throw Error(`${r.status} ${r.statusText}`);
+        return Buffer.from(r.data);
+      },
+      async getKey() {
+        const r = await axios.get(this.static.baseUrl + '/v2/sanity/key', { headers: this.static.headers });
+        if (r.status !== 200) throw Error(`${r.status} ${r.statusText}`);
+        return r.data;
+      },
+      async convert(u, f) {
+        const { key } = await this.getKey();
+        const p = this.resolveConverterPayload(u, f);
+        const h = { key, ...this.static.headers };
+        const r = await axios.post(this.static.baseUrl + '/v2/converter', new URLSearchParams(p), { headers: h });
+        if (r.status !== 200) throw Error(`${r.status} ${r.statusText}`);
+        return r.data;
+      },
+      async download(u, f) {
+        const { url, filename } = await this.convert(u, f);
+        const buffer = await this.getBuffer(url);
+        return { fileName: this.sanitizeFileName(filename), buffer };
+      }
+    };
+
+    async function convertToFast(buffer) {
+      const tempIn = './temp_in.mp4';
+      const tempOut = './temp_out.mp4';
+      fs.writeFileSync(tempIn, buffer);
+      await new Promise((res, rej) => {
+        const ff = spawn('ffmpeg', ['-i', tempIn, '-c', 'copy', '-movflags', 'faststart', tempOut]);
+        ff.on('close', code => code === 0 ? res() : rej(new Error('ffmpeg convert error')));
+      });
+      const newBuffer = fs.readFileSync(tempOut);
+      fs.unlinkSync(tempIn);
+      fs.unlinkSync(tempOut);
+      return newBuffer;
+    }
+
+    const link = args[0];
+    if (!link) return m.reply(`*Example :* .${command} https://youtu.be/JiEW1agPqNY?si=OUpQ4GCaQpLKTL0H`);
+
+    // Send progressing message
+    const msg = await trashcore.sendMessage(m.chat, { text: `⏳ Processing your request, please wait...` }, { quoted: m });
+
+    let f;
+    if (command === 'ytmp4') f = args[1] || '1080p';
+    if (command === 'ytmp3') f = args[1] || '128k';
+
+    let { buffer, fileName } = await yt.download(link, f);
+
+    if (command === 'ytmp4') {
+      buffer = await convertToFast(buffer);
+      await trashcore.sendMessage(m.chat, { video: buffer, mimetype: 'video/mp4', fileName }, { quoted: m });
+    } else {
+      await trashcore.sendMessage(m.chat, { audio: buffer, mimetype: 'audio/mpeg', fileName }, { quoted: m });
+    }
+
+    // Delete progressing message
+    await trashcore.sendMessage(m.chat, { delete: msg.key });
+
+  } catch (e) {
+    m.reply(e.message);
+  }
+  break;
+}
             // ================= PINTEREST =================
 case 'pinterest': {
   try {

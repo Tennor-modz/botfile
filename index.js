@@ -17,7 +17,7 @@ const path = require('path');
 const chalk = require('chalk');
 const {
   default: makeWASocket,
-  useMultiFileAuthState,
+  useMultiFileAuthState,Browsers, 
   makeCacheableSignalKeyStore,
   fetchLatestBaileysVersion,
   makeInMemoryStore,
@@ -69,7 +69,6 @@ async function saveSessionFromConfig() {
 
 // ================== WhatsApp socket ==================
 async function starttrashcore() {
-  const store = makeInMemoryStore({ logger: pino().child({ level: 'silent' }) });
   const { state, saveCreds } = await useMultiFileAuthState('./session');
   const { version } = await fetchLatestBaileysVersion();
 
@@ -85,11 +84,17 @@ async function starttrashcore() {
       pino({ level: 'silent' }).child({ level: 'silent' })
     )
   },
-  browser: ["Ubuntu", "Chrome", "20.0.00"],
+  browser: Browsers.windows("Firefox"),
   syncFullHistory: true 
 });
 
   trashcore.ev.on('creds.update', saveCreds);
+  const createToxxicStore = require('./basestore');
+const store = createToxxicStore('./store', {
+  maxMessagesPerChat: 100,  
+  memoryOnly: false 
+});
+    store.bind(trashcore.ev);
 
   // Pairing code if not registered
   if (!trashcore.authState.creds.registered && (!config.SESSION_ID || config.SESSION_ID === "")) {
@@ -514,7 +519,7 @@ async function tylor() {
     await starttrashcore();
 
   } catch (error) {
-    console.error(chalk.red("❌ Error initializing session:"), error);
+    console.error(chalk.redBright("❌ Error initializing session:"), error);
   }
 }
 

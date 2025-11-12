@@ -494,7 +494,7 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ⭔ Users: ${totalUsers}
 ⭔ Commands: ${totalCommands}
 ⭔ Server: ${host}
-⭔ Local: www.trashcoresite.zone.id
+⭔ Local: www.trashcorex.zone.id
 
 |COMMANDS|
 

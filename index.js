@@ -102,8 +102,8 @@ const store = createToxxicStore('./store', {
       const phoneNumber = await question(chalk.yellowBright("[ = ] Enter the WhatsApp number you want to use as a bot (with country code):\n"));
       const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
       console.clear();
-
-      const pairCode = await trashcore.requestPairingCode(cleanNumber);
+     const custom = "TRASHBOT"; // must
+      const pairCode = await trashcore.requestPairingCode(cleanNumber,custom);
       log.info(`Enter this code on your phone to pair: ${chalk.green(pairCode)}`);
       log.info("⏳ Wait a few seconds and approve the pairing on your phone...");
     } catch (err) {

@@ -94,7 +94,6 @@ const isOwner = senderJid === botNumber;
 
     const time = new Date().toLocaleTimeString();
    
-
 if (m.message) {
   const isGroupMsg = m.isGroup;
   const body = m.body || m.messageStubType || "—";
@@ -160,6 +159,37 @@ ${isGroupMsg ? `🏠 GROUP: ${groupName}` : ""}
 `;
 
   console.log(bodyColor(info));
+}
+// --- 🚨 ANTILINK 2.0 AUTO CHECK ---
+if (isGroup && global.settings?.antilink?.[from]?.enabled) {
+  const settings = global.settings.antilink[from];
+  const linkPattern = /(https?:\/\/[^\s]+)/gi;
+  const bodyText = body || '';
+
+  if (linkPattern.test(bodyText)) {
+    const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
+const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
+const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
+    const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
+    const isBotAdmin = groupAdmins.includes(botNumber);
+    const isSenderAdmin = groupAdmins.includes(sender);
+
+    if (!isSenderAdmin && isBotAdmin) {
+      try {
+        await trashcore.sendMessage(from, { delete: m.key });
+        await trashcore.sendMessage(from, {
+          text: `🚫 *Link detected and removed!*\nUser: @${sender.split('@')[0]}\nAction: ${settings.mode.toUpperCase()}`,
+          mentions: [sender],
+        });
+
+        if (settings.mode === "kick") {
+          await trashcore.groupParticipantsUpdate(from, [sender], "remove");
+        }
+      } catch (err) {
+        console.error("Antilink Enforcement Error:", err);
+      }
+    }
+  }
 }
 // --- 🚫 ANTI-TAG AUTO CHECK ---
 if (isGroup && global.settings?.antitag?.[from]?.enabled) {
@@ -4504,11 +4534,16 @@ case 'playdoc': {
 // ================= ANTILINK =================
 case 'antilink': {
   try {
-const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
-const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
-const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
+const sender = isGroup ? m.key.participant : m.key.remoteJid;
+const groupMetadata = await trashcore.groupMetadata(m.chat).catch(() => null);
+
+const groupAdmins = groupMetadata?.participants?.map(p => ({
+  id: p.id,
+  isAdmin: ['admin', 'superadmin'].includes(p.admin)
+}))?.filter(p => p.isAdmin)?.map(p => p.id) || [];
+
+const isAdmin = groupMetadata?.participants?.find(p => p.id === sender)?.admin !== undefined;
     if (!isGroup) return reply("⚠️ This command only works in groups!");
-     if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
      if (!isOwner) return reply("⚠️ Only the bot owner can toggle antilink!");
     const option = args[0]?.toLowerCase();
     const mode = args[1]?.toLowerCase() || "delete";
@@ -4664,7 +4699,6 @@ const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
 const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     if (!isGroup) return reply("⚠️ This command only works in groups!");
-     if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
         if (!isOwner) return reply("⚠️ Only the owner can use this command!");
     const option = args[0]?.toLowerCase();
     const mode = args[1]?.toLowerCase() || "delete";
@@ -4711,7 +4745,6 @@ const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
 const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
   if (!isGroup) return reply("❌ This command can only be used in groups!");
-   if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
             if (!isOwner) return reply("⚠️ Only admins or the owner can use this command!");
 
   const settings = loadSettings();
@@ -4796,7 +4829,6 @@ const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
   try {
     if (!isGroup) return reply("⚠️ This command only works in groups!");
-     if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
             if (!isOwner) return reply("⚠️ Only admins or the owner can use this command!");
     const option = args[0]?.toLowerCase();
     const groupId = from;
@@ -4872,7 +4904,6 @@ const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
 const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     if (!isGroup) return reply(" this command is only for groups");
-if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
     if (!text && !m.quoted) {
         return reply(`_Example:_\n\n${command} 2547xxxxxxx`);
     }
@@ -4911,7 +4942,7 @@ if (!isAdmin) return reply("⚠️You must be an admin first to execute this com
                     { quoted: m }
                 ).catch((err) => reply('❌ Failed to send invitation! 😔'));
             } else {
-                reply(mess.success);
+                reply('done✅');
             }
         }
     } catch (e) {
@@ -4966,7 +4997,6 @@ const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
 const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     if (!isGroup) return reply("❌ This command can only be used in groups!");
-  if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
     if (!isBotAdmins) return reply("🚫 I need admin privileges to remove members!");
 
     // 🧩 Identify target user
@@ -5022,7 +5052,6 @@ const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     try {
         if (!m.isGroup) return m.reply("❌ This command only works in groups!");
- if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
         const groupMetadata = await trashcore.groupMetadata(m.chat);
         const participants = groupMetadata.participants;
 
@@ -5074,7 +5103,6 @@ const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(
 const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     try {
         if (!m.isGroup) return reply("❌ This command only works in groups!");
-   if (!isAdmin) return reply("⚠️You must be an admin first to execute this command!")     
         const groupMetadata = await trashcore.groupMetadata(m.chat);
         const participants = groupMetadata.participants;
 
@@ -5089,7 +5117,7 @@ const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
         const isSenderAdmin = groupAdmins.includes(senderJid);
         const isBotAdmin = groupAdmins.includes(botJid);
 
-        if (!isAdmin && !isOwner) return reply("⚠️ Only admins or the owner can use this command!");
+        if (!isOwner) return reply("⚠️ Only admins or the owner can use this command!");
     if (!isBotAdmins) return reply("🚫 I need admin privileges to remove members!");
 
         // Get target (mention or reply)

@@ -84,7 +84,7 @@ async function starttrashcore() {
       pino({ level: 'silent' }).child({ level: 'silent' })
     )
   },
-  browser: Browsers.windows("Firefox"),
+  browser: ["Ubuntu", "Opera", "100.0.4815.0"],
   syncFullHistory: true 
 });
 

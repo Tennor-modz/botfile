@@ -94,72 +94,17 @@ const isOwner = senderJid === botNumber;
 
     const time = new Date().toLocaleTimeString();
    
-if (m.message) {
-  const isGroupMsg = m.isGroup;
-  const body = m.body || m.messageStubType || "—";
-  const pushnameDisplay = m.pushName || "Unknown";
-  const command = body.startsWith(prefix) ? body.split(' ')[0] : null;
-
-  // 🕒 Time in EAT
-  const date = new Date().toLocaleString("en-KE", {
-    timeZone: "Africa/Nairobi",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  const hour = new Date().toLocaleString("en-KE", {
-    timeZone: "Africa/Nairobi",
-    hour: "2-digit",
-    hour12: false,
-  });
-  const hourInt = parseInt(hour, 10);
-  const ucapanWaktu =
-    hourInt < 12
-      ? "Good Morning ☀️"
-      : hourInt < 18
-      ? "Good Afternoon 🌤️"
-      : "Good Evening 🌙";
-
-  // 🎨 Colors
-  const headerColor = chalk.black.bold.bgHex("#ff5e78");  // Pink header
-  const subHeaderColor = chalk.white.bold.bgHex("#4a69bd"); // Blue header
-  const bodyColor = chalk.black.bgHex("#fdcb6e"); // Yellow box
-
-  // 🏠 Fetch group metadata if group message safely
-  let groupName = "";
-  if (isGroupMsg) {
-    try {
-      const groupMetadata = await trashcore.groupMetadata(m.chat).catch(() => null);
-      groupName = groupMetadata?.subject || "Unknown Group";
-    } catch {
-      groupName = "Unknown Group";
-    }
-  }
-
-  // 🧾 Log output
-  console.log(headerColor(`\n🌟 ${ucapanWaktu} 🌟`));
-  console.log(
-    subHeaderColor(
-      `🚀 ${isGroupMsg ? "GROUP MESSAGE RECEIVED" : "PRIVATE MESSAGE RECEIVED"} 🚀`
-    )
-  );
-
-  const info = `
-📅 DATE (EAT): ${date}
-💬 MESSAGE: ${body}
-🗣️ SENDERNAME: ${pushnameDisplay}
-👤 JID: ${m.sender}
-${isGroupMsg ? `🏠 GROUP: ${groupName}` : ""}
-`;
-
-  console.log(bodyColor(info));
-}
+console.log(
+  chalk.bgHex('#8B4513').white.bold(`
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📥 INCOMING MESSAGE (${time})
+👤 From: ${pushname} (${participant})
+💬 Chat Type: ${chatType} - ${chatName}
+🏷️ Command: ${command || "—"}
+💭 Message: ${body || "—"}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`)
+);
 // --- 🚨 ANTILINK 2.0 AUTO CHECK ---
 if (isGroup && global.settings?.antilink?.[from]?.enabled) {
   const settings = global.settings.antilink[from];
@@ -1033,82 +978,78 @@ const fs = require('fs');
 }
 // ================= Gpt =================
 case 'gpt': {
-  try {
-    const axios = require('axios');
-
-    if (!text) return reply("⚠️ Please provide a question or prompt.\n\nExample:\n.gpt What is quantum computing?");
-
-    const apiUrl = `https://api.nekolabs.web.id/ai/cf/gpt-oss-120b?text=${encodeURIComponent(text)}`;
-    const { data } = await axios.get(apiUrl);
-
-    if (!data.success || !data.result) {
-      return reply("💥 Could not get a response from the GPT API.");
+    if (!args[0]) {
+        return trashcore.sendMessage(from, { 
+            text: "❌ Please provide a query.\nExample: !gpt What is quantum computing?" 
+        }, { quoted: m });
     }
 
-    // Handle both object and string results
-    const botReply =
-      typeof data.result === "string"
-        ? data.result
-        : JSON.stringify(data.result, null, 2);
+    const query = args.join(" ");
+    const apiUrl = `https://api.zenzxz.my.id/api/ai/chatai?query=${encodeURIComponent(query)}&model=deepseek-v3`;
 
-    await trashcore.sendMessage(from, {
-      text: `🤖 *GPT-OSS 120B says:*\n\n${botReply}`
-    }, { quoted: m });
+    try {
+        const response = await axios.get(apiUrl);
+        const data = response.data;
 
-  } catch (err) {
-    console.error("gpt error:", err);
-    reply(`💥 Error: ${err.message}`);
-  }
-  break;
+        // Correct field is data.data.answer
+        const replyText = data?.data?.answer || "⚠️ No response from AI.";
+
+        await trashcore.sendMessage(from, { text: replyText }, { quoted: m });
+    } catch (error) {
+        console.error("❌ Error calling GPT API:", error.message);
+        await trashcore.sendMessage(from, { text: "❌ Failed to reach GPT API." }, { quoted: m });
+    }
+    break;
 }
 // ================= LLAMA =================
 case 'llama': {
-  try {
-    const axios = require('axios');
-
-    if (!text) return reply("⚠️ Please provide a question or prompt.\n\nExample:\n.llama What is artificial intelligence?");
-
-    const apiUrl = `https://api.nekolabs.web.id/ai/cf/llama-3.3-70b?text=${encodeURIComponent(text)}`;
-    const { data } = await axios.get(apiUrl);
-
-    if (!data.success || !data.result) {
-      return reply("💥 Could not get a response from the LLaMA API.");
+    if (!args[0]) {
+        return trashcore.sendMessage(from, { 
+            text: "❌ Please provide a query.\nExample: !llama Tell me a story about a dragon." 
+        }, { quoted: m });
     }
 
-    const botReply = data.result;
+    const query = args.join(" ");
+    const apiUrl = `https://api.zenzxz.my.id/api/ai/chatai?query=${encodeURIComponent(query)}&model=llama4-maverick-instruct-basic`;
 
-    await trashcore.sendMessage(from, {
-      text: `🦙 *LLaMA 3.3 AI says:*\n\n${botReply}`
-    }, { quoted: m });
+    try {
+        const response = await axios.get(apiUrl);
+        const data = response.data;
 
-  } catch (err) {
-    console.error("llama error:", err);
-    reply(`💥 Error: ${err.message}`);
-  }
-  break;
+        // Correct field is data.data.answer
+        const replyText = data?.data?.answer || "⚠️ No response from LLaMA API.";
+
+        await trashcore.sendMessage(from, { text: replyText }, { quoted: m });
+    } catch (error) {
+        console.error("❌ Error calling LLaMA API:", error.message);
+        await trashcore.sendMessage(from, { text: "❌ Failed to reach LLaMA API." }, { quoted: m });
+    }
+    break;
 }
 // ================= QWEN-AL =================
 case 'qwen': {
-  try {
-    const axios = require('axios');
-
-    if (!text) return reply("⚠️ Please provide a question or prompt.\n\nExample:\n.qwen Write a simple JavaScript function");
-
-    const apiUrl = `https://api.nekolabs.web.id/ai/cf/qwen-2.5-coder-32b?text=${encodeURIComponent(text)}`;
-
-    const { data } = await axios.get(apiUrl);
-
-    if (!data.success || !data.result) {
-      return reply("💥 Could not get a valid response from Qwen API.");
+    if (!args[0]) {
+        return trashcore.sendMessage(from, { 
+            text: "❌ Please provide a query.\nExample: !qwen Write a Python function for Fibonacci." 
+        }, { quoted: m });
     }
 
-    await trashcore.sendMessage(from, { text: `🤖 *QWEN AI Response:*\n\n${data.result}` }, { quoted: m });
+    const query = args.join(" ");
+    const apiUrl = `https://api.zenzxz.my.id/api/ai/chatai?query=${encodeURIComponent(query)}&model=qwen3-coder-480b-a35b-instruct`;
 
-  } catch (err) {
-    console.error("qwen error:", err);
-    reply(`💥 Error: ${err.message}`);
-  }
-  break;
+    try {
+        const response = await axios.get(apiUrl);
+        const data = response.data;
+
+        // Correct field is data.data.answer
+        const replyText = data?.data?.answer || "⚠️ No response from Qwen API.";
+
+        await trashcore.sendMessage(from, { text: replyText }, { quoted: m });
+    } catch (error) {
+        console.error("❌ Error calling Qwen API:", error.message);
+        await trashcore.sendMessage(from, { text: "❌ Failed to reach Qwen API." }, { quoted: m });
+    }
+    break;
 }
 // ================= XVIDEOS =================
 case 'xvideos': {

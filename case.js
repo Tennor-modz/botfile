@@ -460,7 +460,7 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 
 🧑 Owner: ${ownerName}
 📝 Type: Multi Device
-⚡ Version: 3.5.0
+⚡ Version: 4.0.0
 📦 Module: Case
 
 🧠 ┃Stats┃
@@ -519,6 +519,7 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ┃⭔ ytmp4
 ┃⭔ playdoc
 ┃⭔ mediafire
+┃⭔ image
 ┃⭔ sfile
 ┃⭔ waifu
 ┃⭔ hentai
@@ -542,6 +543,8 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ┃⭔ demote
 ┃⭔ antilink
 ┃⭔ antitag
+┃⭔ approve
+┃⭔ reject
 ┃⭔ antipromote
 ┃⭔ antidemote
 ┃⭔ antibadword
@@ -553,6 +556,7 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ┃⭔ setgoodbye
 ┃⭔ listactive
 ┃⭔ listinactive
+┃⭔ linkgc
 
 📍 CONVERSION
 ┃⭔ toaudio
@@ -1049,6 +1053,121 @@ case 'qwen': {
         console.error("❌ Error calling Qwen API:", error.message);
         await trashcore.sendMessage(from, { text: "❌ Failed to reach Qwen API." }, { quoted: m });
     }
+    break;
+}
+// =================REJECT=================
+case 'reject': {
+    if (!m.isGroup) return reply(mess.group);
+    if (!isOwner) return reply("This feature is only for bot owner.");
+
+    let responseList;
+    try {
+        responseList = await trashcore.groupRequestParticipantsList(m.chat);
+    } catch (err) {
+        console.error(err);
+        return reply("❌ Failed to fetch pending requests.");
+    }
+
+    if (!responseList || responseList.length === 0) {
+        return reply("ℹ️ No pending requests detected.");
+    }
+
+    for (const participan of responseList) {
+        try {
+            await trashcore.groupRequestParticipantsUpdate(
+                m.chat,
+                [participan.jid], // Participant ID
+                "reject" // reject each request
+            );
+        } catch (err) {
+            console.error(`Failed to reject ${participan.jid}:`, err);
+        }
+    }
+
+    reply("🚫 All pending requests have been rejected!");
+    break;
+}
+// =================LINKGC=================
+case 'linkgc': {
+    if (!m.isGroup) return reply("This command only works in groups.");
+    try {
+        // Fetch group metadata
+        const meta = await trashcore.groupMetadata(m.chat);
+
+        const groupName = meta.subject || "Unknown";
+        const members = meta.participants || [];
+        const totalMembers = members.length;
+
+        // Count admins
+        const admins = members.filter(p => p.admin !== null);
+        const numAdmins = admins.length;
+
+        // Fetch group link
+        const linkCode = await trashcore.groupInviteCode(m.chat);
+        const groupLink = `https://chat.whatsapp.com/${linkCode}`;
+
+        // Fetch group profile picture
+        let pfp;
+        try {
+            pfp = await trashcore.profilePictureUrl(m.chat, "image");
+        } catch {
+            pfp = null; // No profile photo
+        }
+
+        // Build message
+        let caption = `
+📌 *Group Information*
+--------------------------------
+🏷️ *Name:* ${groupName}
+👥 *Members:* ${totalMembers}
+🛡️ *Admins:* ${numAdmins}
+🔗 *Link:* ${groupLink}
+--------------------------------
+        `.trim();
+
+        // Send message with or without image
+        if (pfp) {
+            await trashcore.sendMessage(m.chat, { image: { url: pfp }, caption });
+        } else {
+            await trashcore.sendMessage(m.chat, { text: caption });
+        }
+
+    } catch (e) {
+        console.log(e);
+        reply("❌ Failed to get group info.");
+    }
+}
+break;
+// =================APPROVE=================
+case 'approve': {
+    if (!m.isGroup) return reply(mess.group);
+    if (!isOwner) return reply("❌ This feature is only for bot owner only.");
+
+    let responseList;
+    try {
+        responseList = await trashcore.groupRequestParticipantsList(m.chat);
+    } catch (err) {
+        console.error(err);
+        return reply("❌ Failed to fetch pending requests.");
+    }
+
+    if (!responseList || responseList.length === 0) {
+        return reply("ℹ️ No pending requests detected at the moment!");
+    }
+
+    for (const participan of responseList) {
+        try {
+            await trashcore.groupRequestParticipantsUpdate(
+                m.chat,
+                [participan.jid], // Approve/reject each participant individually
+                "approve" // or "reject"
+            );
+        } catch (err) {
+            console.error(`Failed to approve ${participan.jid}:`, err);
+        }
+    }
+
+    reply("✅ TRASHCORE BOT has approved all pending requests!");
     break;
 }
 // ================= XVIDEOS =================
@@ -3683,82 +3802,227 @@ case 'igdl2': {
 }
 // ================= SONG =================
 case 'song':
-case 'playmusic': {
-const axios = require('axios');
-const fs = require('fs');
-const ffmpeg = require('fluent-ffmpeg');
-const path = require('path');
-    async function getBuffer(url) {
-        try {
-            const res = await axios.get(url, { responseType: 'arraybuffer' });
-            return Buffer.from(res.data, 'binary');
-        } catch (err) {
-            console.error('Error fetching buffer:', err);
-            throw err;
-        }
-    }
+case 'ytplay': {
+  const axios = require("axios");
+  const yts = require("yt-search");
 
-    if (!q) return reply("please provide a song name!");
+  // User query
+  const q = args.join(" ") || (m.quoted && m.quoted.text);
+  if (!q) return reply("What song do you want to search?");
 
-    try {
-        const apiUrl = `https://savant-api.vercel.app/download/play?query=${encodeURIComponent(q)}`;
-        const response = await axios.get(apiUrl);
-        const result = response.data?.result;
+  await reply("🔍 Searching for your song...");
 
-        if (!result) return reply("❌ Could not find the song.");
+  // Search Video
+  const res = await yts(q);
+  const v = res.videos[0];
+  if (!v) return reply("❌ Song not found.");
 
-        const { title, author, duration, thumbnail, download } = result;
+  // Preview Message
+  await trashcore.sendMessage(
+    m.chat,
+    {
+      image: { url: v.thumbnail },
+      caption: `
+🎵 *Now Playing:* ${v.title}
 
-        if (!download) return reply("❌ Audio link not available. Try another song.");
+🔶 *Author:* ${v.author.name}
+🔶 *Views:* ${v.views.toLocaleString()}
+🔶 *Duration:* ${v.timestamp}
+🔶 *Uploaded:* ${v.ago}
 
-        // Fetch thumbnail
-        const thumbBuffer = await getBuffer(thumbnail);
+> Downloading audio…
+`,
+    },
+    { quoted: m }
+  );
 
-        const captionText = `
-🎵 *Now Playing - MP3*
+  // --- YT DL ENGINE ---
+  const yt = {
+    url: Object.freeze({
+      audio128: "https://api.apiapi.lat",
+      video: "https://api5.apiapi.lat",
+      else: "https://api3.apiapi.lat",
+      referrer: "https://ogmp3.pro/",
+    }),
 
-🔶 Title: ${title}
-🔶 Artist: ${author}
-🔶 Duration: ${duration}
-        `;
+    encUrl: (s) =>
+      s
+        .split("")
+        .map((c) => c.charCodeAt())
+        .reverse()
+        .join(";"),
 
-        // Send thumbnail first
-        await trashcore.sendMessage(m.chat, {
-            image: { url: thumbnail },
-            caption: captionText
-        }, { quoted: m });
+    xor: (s) =>
+      s
+        .split("")
+        .map((v) => String.fromCharCode(v.charCodeAt() ^ 1))
+        .join(""),
 
-        // Download original audio temporarily
-        const tempAudioPath = path.join(__dirname, `${title}.mp3`);
-        const audioRes = await axios.get(download, { responseType: 'arraybuffer' });
-        fs.writeFileSync(tempAudioPath, audioRes.data);
+    genRandomHex: () =>
+      Array.from({ length: 32 }, () =>
+        "0123456789abcdef"[Math.floor(Math.random() * 16)]
+      ).join(""),
 
-        // Convert audio to lower bitrate (e.g., 64kbps)
-        const lowAudioPath = path.join(__dirname, `${title}_low.mp3`);
-        await new Promise((resolve, reject) => {
-            ffmpeg(tempAudioPath)
-                .audioBitrate(64)
-                .save(lowAudioPath)
-                .on('end', resolve)
-                .on('error', reject);
-        });
+    resolvePayload: function (ytUrl, userFormat) {
+      const valid = [
+        "64k","96k","128k","192k","256k","320k",
+        "240p","360p","480p","720p","1080p"
+      ];
 
-        // Send the smaller audio
-        await trashcore.sendMessage(m.chat, {
-            audio: { url: lowAudioPath },
-            mimetype: 'audio/mpeg',
-            fileName: `${title}.mp3`
-        }, { quoted: m });
+      if (!valid.includes(userFormat))
+        throw Error(`Wrong format. Available: ${valid.join(", ")}`);
 
-        // Cleanup temporary files
-        fs.unlinkSync(tempAudioPath);
-        fs.unlinkSync(lowAudioPath);
+      let apiOrigin = this.url.audio128;
+      let data = this.xor(ytUrl);
+      let referer = this.url.referrer;
+      let format = "0";
+      let mp3Quality = "128";
+      let mp4Quality = "720";
 
-    } catch (err) {
-        console.error(err);
-        reply("❌ Failed to fetch or process the audio.");
-    }
-    break;
+      if (/^\d+p$/.test(userFormat)) {
+        apiOrigin = this.url.video;
+        format = "1";
+        mp4Quality = userFormat.replace("p","");
+      } else if (userFormat !== "128k") {
+        apiOrigin = this.url.else;
+        mp3Quality = userFormat.replace("k","");
+      }
+
+      return {
+        apiOrigin,
+        payload: {
+          data,
+          format,
+          referer,
+          mp3Quality,
+          mp4Quality,
+          userTimeZone: "-480",
+        },
+      };
+    },
+
+    init: async function (rpObj) {
+      const { apiOrigin, payload } = rpObj;
+      const api =
+        apiOrigin +
+        "/" +
+        this.genRandomHex() +
+        "/init/" +
+        this.encUrl(this.xor(payload.data)) +
+        "/" +
+        this.genRandomHex() +
+        "/";
+
+      const r = await axios.post(api, payload, {
+        headers: {
+          "Content-Type": "application/json",
+          "Origin": "https://ogmp3.pro",
+          "Referer": "https://ogmp3.pro/",
+        },
+      });
+
+      return r.data;
+    },
+
+    genFileUrl: function (i, pk, rpObj) {
+      const { apiOrigin } = rpObj;
+      const pkValue = pk ? pk + "/" : "";
+      return {
+        downloadUrl:
+          apiOrigin +
+          "/" +
+          this.genRandomHex() +
+          "/download/" +
+          i +
+          "/" +
+          this.genRandomHex() +
+          "/" +
+          pkValue,
+      };
+    },
+
+    statusCheck: async function (i, pk, rpObj) {
+      const { apiOrigin } = rpObj;
+      let json;
+      let count = 0;
+
+      do {
+        await new Promise((r) => setTimeout(r, 5000));
+        count++;
+
+        const pkVal = pk ? pk + "/" : "";
+        const api =
+          apiOrigin +
+          "/" +
+          this.genRandomHex() +
+          "/status/" +
+          i +
+          "/" +
+          this.genRandomHex() +
+          "/" +
+          pkVal;
+
+        const r = await axios.post(
+          api,
+          { data: i },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "Origin": "https://ogmp3.pro",
+              "Referer": "https://ogmp3.pro/",
+            },
+          }
+        );
+
+        json = r.data;
+
+        if (count >= 100) throw Error("Polling reached 100, stopped.");
+      } while (json.s === "P");
+
+      if (json.s === "E") throw Error(JSON.stringify(json));
+      return this.genFileUrl(i, pk, rpObj);
+    },
+
+    download: async function (url, fmt = "128k") {
+      const rpObj = this.resolvePayload(url, fmt);
+      const initObj = await this.init(rpObj);
+      const { i, pk, s } = initObj;
+      if (s === "C") return this.genFileUrl(i, pk, rpObj);
+      return this.statusCheck(i, pk, rpObj);
+    },
+  };
+
+  // Download file and send as buffer (fix 403)
+  try {
+    const dl = await yt.download(v.url, "128k");
+
+    const audioRes = await axios.get(dl.downloadUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://ogmp3.pro/",
+        "Origin": "https://ogmp3.pro/",
+      },
+    });
+
+    const buffer = Buffer.from(audioRes.data);
+
+    await trashcore.sendMessage(
+      m.chat,
+      {
+        audio: buffer,
+        mimetype: "audio/mpeg",
+        fileName: v.title + ".mp3",
+      },
+      { quoted: m }
+    );
+
+  } catch (err) {
+    console.log("❌ AUDIO DOWNLOAD FAILED:", err.message);
+    reply("❌ Failed to download audio. Try again later.");
+  }
+
+  break;
 }
 // ================= YTMP3 =================
 case 'ytmp3':
@@ -3899,6 +4163,46 @@ case 'spotify': {
     console.error('spotify error:', err);
     reply(`💥 Error: ${err.message}`);
   }
+  break;
+}
+ // ================= IMAGES =================
+case "imgsearch":
+case "image": {
+  const q = args.join(" ") || (m.quoted && m.quoted.text);
+  if (!q) return reply("❌ Please provide a search query!");
+
+  await reply("🔍 Searching for images...");
+
+  try {
+    const res = await axios.get(
+      `https://api.zenzxz.my.id/api/search/googleimage?query=${encodeURIComponent(q)}`,
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      }
+    );
+
+    if (!res.data || !res.data.data || res.data.data.length === 0)
+      return reply("❌ No images found.");
+
+    // Pick a random image from the results
+    const img = res.data.data[Math.floor(Math.random() * res.data.data.length)];
+
+    await trashcore.sendMessage(
+      m.chat,
+      {
+        image: { url: img.url },
+        caption: `📸 Result for: *${q}*`,
+      },
+      { quoted: m }
+    );
+  } catch (err) {
+    console.error(err);
+    reply("❌ Failed to fetch images. Try again later.");
+  }
+
   break;
 }
             // ================= WEB2ZIP =================

@@ -143,6 +143,7 @@ setTimeout(async () => {
 ┃➥ Developer: Trashcore
 ┃➥ Version: Ultra
 ┃➥ Number: ${botNumber}
+┃➥ Web: www.trashcorex.zone.id
 ╰───────────────
 `;
 

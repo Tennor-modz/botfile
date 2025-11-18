@@ -498,7 +498,6 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ┃⭔ checktime
 ┃⭔ gitclone
 ┃⭔ repo
-┃⭔ fact
 ┃⭔ claude-al
 ┃⭔ gitstalk
 ┃⭔ ssweb
@@ -583,6 +582,34 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ┃⭔ restart
 ┃⭔ getcase
 ┃⭔ getdep
+
+🏟️ SPORTS
+┃⭔ livescore
+┃⭔ player
+┃⭔ club
+┃⭔ eplfixtures 
+┃⭔ eplstandings 
+┃⭔ epltopscorers 
+┃⭔ bundesliga
+┃⭔ bundesligastats 
+┃⭔ bundesligascores
+┃⭔ laligamatches 
+┃⭔ laligatable 
+┃⭔ laligascorers 
+┃⭔ ligue-1 
+┃⭔ ligue1table 
+┃⭔ liguescorers 
+┃⭔ serieamatches 
+┃⭔ serieastats
+┃⭔ serieascorers 
+
+🤡 FUN
+┃⭔ fact
+┃⭔ truth
+┃⭔ dare
+┃⭔ insult 
+┃⭔ jokes
+┃⭔ quote
 
 👤 UTILITY / BASIC
 ┃⭔ cat
@@ -2391,74 +2418,48 @@ case 'url': {
 case 'shazam': {
   try {
     const axios = require('axios');
-    const fs = require('fs');
-    const path = require('path');
-    const { tmpdir } = require('os');
-    const FormData = require('form-data'); // ✅ Node-compatible FormData
     const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
-    // Detect quoted audio or voice note
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-    const msg = (quotedMsg?.audioMessage || quotedMsg?.voiceMessage) || m.message?.audioMessage || m.message?.voiceMessage;
-    if (!msg) return reply("⚠️ Reply to a voice note or audio with this command!");
+    const msg = (quotedMsg && (quotedMsg.audioMessage || quotedMsg.voiceMessage)) || m.message?.audioMessage || m.message?.voiceMessage;
 
-    // Download audio
-    const stream = await downloadContentFromMessage(msg, 'audio');
+    if (!msg) {
+      return reply("🎧 Please reply to an *audio* or *voice* message to identify the song!");
+    }
+
+    await trashcore.sendMessage(m.chat, { react: { text: "⏳", key: m.key } });
+
+    const stream = await downloadContentFromMessage(msg, msg.type === 'audioMessage' ? 'audio' : 'voice');
     let buffer = Buffer.from([]);
     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-    // Save temporary file
-    const tmpFile = path.join(tmpdir(), `shazam_${Date.now()}.mp3`);
-    fs.writeFileSync(tmpFile, buffer);
+    // If your API needs a URL, you must host this buffer somewhere; otherwise, some APIs accept base64
+    const audioBase64 = buffer.toString('base64');
 
-    reply("🎵 Recognizing song, please wait...");
+    const res = await axios.get(`https://apiskeith.vercel.app/ai/shazam?url=<HOSTED_URL_OF_AUDIO>`); 
+    // Replace <HOSTED_URL_OF_AUDIO> with your hosted audio if needed
 
-    // Send to AudD API
-    const auddApiKey = '7c1c26edbb767c35c81249555048c288'; // <-- Replace with your key
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(tmpFile));
-    formData.append('return', 'apple_music,spotify,deezer');
-    formData.append('api_token', auddApiKey);
+    if (!res.data.status) {
+      return reply("❌ Failed to recognize the song.");
+    }
 
-    const res = await axios.post('https://api.audd.io/', formData, {
-      headers: formData.getHeaders()
-    });
-
-    const result = res.data?.result;
-    if (!result) return reply("❌ Could not recognize the song!");
-
-    const title = result.title || 'Unknown';
-    const artist = result.artist || 'Unknown';
-    const album = result.album || 'Unknown';
-    const release = result.release_date || 'Unknown';
-    const apple = result.apple_music?.url || '';
-    const spotify = result.spotify?.external_urls?.spotify || '';
-    const deezer = result.deezer?.link || '';
-
+    const result = res.data.result;
     let text = `🎶 *Song Recognized!*\n\n`;
-    text += `• *Title:* ${title}\n`;
-    text += `• *Artist:* ${artist}\n`;
-    text += `• *Album:* ${album}\n`;
-    text += `• *Release:* ${release}\n`;
-    if (apple) text += `• [Apple Music](${apple})\n`;
-    if (spotify) text += `• [Spotify](${spotify})\n`;
-    if (deezer) text += `• [Deezer](${deezer})\n`;
+    text += `Title: ${result.title ?? "Unknown"}\n`;
+    text += `Artist: ${result.artist ?? "Unknown"}\n`;
+    if (result.album) text += `Album: ${result.album}\n`;
+    if (result.releaseDate) text += `Released: ${result.releaseDate}\n`;
+    if (result.shazamUrl) text += `🔗 More info: ${result.shazamUrl}\n`;
 
-    await trashcore.sendMessage(from, {
-      text,
-      jpegThumbnail: buffer // show audio thumbnail if possible
-    }, { quoted: m });
-
-    // Cleanup
-    fs.unlinkSync(tmpFile);
-
+    reply(text);
+    await trashcore.sendMessage(m.chat, { react: { text: "✅", key: m.key } });
   } catch (err) {
-    console.error(err);
-    reply(`💥 Error recognizing song: ${err.message}`);
+    console.error("❌ Shazam Error:", err);
+    reply("💥 Failed to identify the song. Please try again later.");
+    await trashcore.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
   }
   break;
 }
-
 // =================TO VIDEO=================
 case 'tovid':
 case 'tovideo': {
@@ -3025,20 +3026,127 @@ case 'convertphoto': {
   }
   break;
 }
+// ================= TRUTH =================
+case 'truth': {
+  try {
+    const axios = require('axios');
+    const res = await axios.get('https://apiskeith.vercel.app/fun/truth');
+    
+    if (res.data?.status) {
+      reply(`🗣️ *Truth:*\n\n${res.data.result}`);
+    } else {
+      reply('❌ Failed to fetch a truth. Try again later.');
+    }
+  } catch (err) {
+    console.error('❌ Truth Error:', err);
+    reply('💥 Error fetching truth. Please try again later.');
+  }
+  break;
+}
+// ================= Dare =================
+case 'dare': {
+  try {
+    const axios = require('axios');
+    const res = await axios.get('https://apiskeith.vercel.app/fun/dare');
+
+    if (res.data?.status) {
+      reply(`🎯 *Dare:*\n\n${res.data.result}`);
+    } else {
+      reply('❌ Failed to fetch a dare. Try again later.');
+    }
+  } catch (err) {
+    console.error('❌ Dare Error:', err);
+    reply('💥 Error fetching dare. Please try again later.');
+  }
+  break;
+}
+// ================= Jokes =================
+case 'jokes': {
+  try {
+    const axios = require('axios');
+    const res = await axios.get('https://apiskeith.vercel.app/fun/jokes');
+
+    if (res.data?.status && res.data.result) {
+      const { setup, punchline } = res.data.result;
+      reply(`😂 *Joke:*\n\n${setup}\n\n💡 *Punchline:*\n${punchline}`);
+    } else {
+      reply('❌ Failed to fetch a joke. Try again later.');
+    }
+  } catch (err) {
+    console.error('❌ Joke Error:', err);
+    reply('💥 Error fetching joke. Please try again later.');
+  }
+  break;
+}
+// ================= Quote =================
+case 'quote': {
+  try {
+    const axios = require('axios');
+
+    await trashcore.sendMessage(m.chat, { react: { text: "⏳", key: m.key } });
+
+    // Fetch the quote JSON
+    const res = await axios.get('https://apiskeith.vercel.app/quote/audio');
+    if (!res.data?.status || !res.data.result) 
+      return reply('❌ Failed to fetch a quote. Try again later.');
+
+    const quotes = res.data.result.data
+      .filter(q => q.type === 'quote')
+      .map(q => q.text)
+      .join('\n\n');
+
+    const audioUrl = res.data.result.mp3;
+
+    // Send quote text
+    if (quotes) await reply(`📝 *Quote(s):*\n\n${quotes}`);
+
+    // Send audio
+    await trashcore.sendMessage(m.chat, { 
+      audio: { url: audioUrl }, 
+      mimetype: 'audio/mpeg', 
+      ptt: false 
+    });
+
+    await trashcore.sendMessage(m.chat, { react: { text: "✅", key: m.key } });
+
+  } catch (err) {
+    console.error('❌ Quote Error:', err);
+    reply('💥 Error fetching quote. Please try again later.');
+    await trashcore.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
+  }
+  break;
+}
+// ================= Insult =================
+case 'insult': {
+  try {
+    const axios = require('axios');
+    const res = await axios.get('https://apiskeith.vercel.app/fun/insult');
+
+    if (res.data?.status) {
+      reply(`🗯️ *Insult:*\n\n${res.data.result}`);
+    } else {
+      reply('❌ Failed to fetch an insult. Try again later.');
+    }
+  } catch (err) {
+    console.error('❌ Insult Error:', err);
+    reply('💥 Error fetching insult. Please try again later.');
+  }
+  break;
+}
 // ================= FACT =================
 case 'fact': {
   try {
-    await reply('🔍 Fetching a random fact...');
-    const data = await fetchJson('https://api.dreaded.site/api/fact');
-
-    if (!data || !data.fact) {
-      return reply('❌ Could not fetch a fact. Try again later.');
+    const axios = require('axios');
+    const res = await axios.get('https://apiskeith.vercel.app/fun/fact');
+    
+    if (res.data?.status) {
+      reply(`📝 *Fun Fact:*\n\n${res.data.result}`);
+    } else {
+      reply('❌ Failed to fetch a fact. Try again later.');
     }
-
-    await reply(`💡 Random Fact:\n\n${data.fact}`);
   } catch (err) {
-    console.error('Fact Command Error:', err);
-    await reply('❌ Failed to fetch a fact. Please try again.');
+    console.error('❌ Fact Error:', err);
+    reply('💥 Error fetching fact. Please try again later.');
   }
   break;
 }
@@ -3801,229 +3909,48 @@ case 'igdl2': {
   break;
 }
 // ================= SONG =================
-case 'song':
-case 'ytplay': {
-  const axios = require("axios");
-  const yts = require("yt-search");
-
-  // User query
-  const q = args.join(" ") || (m.quoted && m.quoted.text);
-  if (!q) return reply("What song do you want to search?");
-
-  await reply("🔍 Searching for your song...");
-
-  // Search Video
-  const res = await yts(q);
-  const v = res.videos[0];
-  if (!v) return reply("❌ Song not found.");
-
-  // Preview Message
-  await trashcore.sendMessage(
-    m.chat,
-    {
-      image: { url: v.thumbnail },
-      caption: `
-🎵 *Now Playing:* ${v.title}
-
-🔶 *Author:* ${v.author.name}
-🔶 *Views:* ${v.views.toLocaleString()}
-🔶 *Duration:* ${v.timestamp}
-🔶 *Uploaded:* ${v.ago}
-
-> Downloading audio…
-`,
-    },
-    { quoted: m }
-  );
-
-  // --- YT DL ENGINE ---
-  const yt = {
-    url: Object.freeze({
-      audio128: "https://api.apiapi.lat",
-      video: "https://api5.apiapi.lat",
-      else: "https://api3.apiapi.lat",
-      referrer: "https://ogmp3.pro/",
-    }),
-
-    encUrl: (s) =>
-      s
-        .split("")
-        .map((c) => c.charCodeAt())
-        .reverse()
-        .join(";"),
-
-    xor: (s) =>
-      s
-        .split("")
-        .map((v) => String.fromCharCode(v.charCodeAt() ^ 1))
-        .join(""),
-
-    genRandomHex: () =>
-      Array.from({ length: 32 }, () =>
-        "0123456789abcdef"[Math.floor(Math.random() * 16)]
-      ).join(""),
-
-    resolvePayload: function (ytUrl, userFormat) {
-      const valid = [
-        "64k","96k","128k","192k","256k","320k",
-        "240p","360p","480p","720p","1080p"
-      ];
-
-      if (!valid.includes(userFormat))
-        throw Error(`Wrong format. Available: ${valid.join(", ")}`);
-
-      let apiOrigin = this.url.audio128;
-      let data = this.xor(ytUrl);
-      let referer = this.url.referrer;
-      let format = "0";
-      let mp3Quality = "128";
-      let mp4Quality = "720";
-
-      if (/^\d+p$/.test(userFormat)) {
-        apiOrigin = this.url.video;
-        format = "1";
-        mp4Quality = userFormat.replace("p","");
-      } else if (userFormat !== "128k") {
-        apiOrigin = this.url.else;
-        mp3Quality = userFormat.replace("k","");
-      }
-
-      return {
-        apiOrigin,
-        payload: {
-          data,
-          format,
-          referer,
-          mp3Quality,
-          mp4Quality,
-          userTimeZone: "-480",
-        },
-      };
-    },
-
-    init: async function (rpObj) {
-      const { apiOrigin, payload } = rpObj;
-      const api =
-        apiOrigin +
-        "/" +
-        this.genRandomHex() +
-        "/init/" +
-        this.encUrl(this.xor(payload.data)) +
-        "/" +
-        this.genRandomHex() +
-        "/";
-
-      const r = await axios.post(api, payload, {
-        headers: {
-          "Content-Type": "application/json",
-          "Origin": "https://ogmp3.pro",
-          "Referer": "https://ogmp3.pro/",
-        },
-      });
-
-      return r.data;
-    },
-
-    genFileUrl: function (i, pk, rpObj) {
-      const { apiOrigin } = rpObj;
-      const pkValue = pk ? pk + "/" : "";
-      return {
-        downloadUrl:
-          apiOrigin +
-          "/" +
-          this.genRandomHex() +
-          "/download/" +
-          i +
-          "/" +
-          this.genRandomHex() +
-          "/" +
-          pkValue,
-      };
-    },
-
-    statusCheck: async function (i, pk, rpObj) {
-      const { apiOrigin } = rpObj;
-      let json;
-      let count = 0;
-
-      do {
-        await new Promise((r) => setTimeout(r, 5000));
-        count++;
-
-        const pkVal = pk ? pk + "/" : "";
-        const api =
-          apiOrigin +
-          "/" +
-          this.genRandomHex() +
-          "/status/" +
-          i +
-          "/" +
-          this.genRandomHex() +
-          "/" +
-          pkVal;
-
-        const r = await axios.post(
-          api,
-          { data: i },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              "Origin": "https://ogmp3.pro",
-              "Referer": "https://ogmp3.pro/",
-            },
-          }
-        );
-
-        json = r.data;
-
-        if (count >= 100) throw Error("Polling reached 100, stopped.");
-      } while (json.s === "P");
-
-      if (json.s === "E") throw Error(JSON.stringify(json));
-      return this.genFileUrl(i, pk, rpObj);
-    },
-
-    download: async function (url, fmt = "128k") {
-      const rpObj = this.resolvePayload(url, fmt);
-      const initObj = await this.init(rpObj);
-      const { i, pk, s } = initObj;
-      if (s === "C") return this.genFileUrl(i, pk, rpObj);
-      return this.statusCheck(i, pk, rpObj);
-    },
-  };
-
-  // Download file and send as buffer (fix 403)
+case 'song': {
   try {
-    const dl = await yt.download(v.url, "128k");
+    const axios = require('axios');
+    const yts = require('yt-search'); // install yt-search if not already
 
-    const audioRes = await axios.get(dl.downloadUrl, {
-      responseType: "arraybuffer",
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": "https://ogmp3.pro/",
-        "Origin": "https://ogmp3.pro/",
-      },
-    });
+    if (!args.length) return reply("🎵 Provide a song name or link!");
 
-    const buffer = Buffer.from(audioRes.data);
+    const query = args.join(" ");
 
+    let videoUrl = query;
+
+    // If it doesn't look like a URL, search YouTube
+    if (!query.startsWith('http')) {
+      const searchResult = await yts(query);
+      if (!searchResult.videos.length) return reply("❌ No results found!");
+      videoUrl = searchResult.videos[0].url; // Take first result
+    }
+
+    // Call your audio-download API
+    const apiUrl = `https://apiskeith.vercel.app/download/audio?url=${encodeURIComponent(videoUrl)}`;
+    const { data } = await axios.get(apiUrl);
+
+    if (!data || !data.status || !data.result) return reply("❌ Failed to get download URL.");
+
+    const audioUrl = data.result;
+
+    // Send the audio
     await trashcore.sendMessage(
       m.chat,
       {
-        audio: buffer,
+        audio: { url: audioUrl },
         mimetype: "audio/mpeg",
-        fileName: v.title + ".mp3",
+        fileName: "song.mp3"
       },
       { quoted: m }
     );
-
-  } catch (err) {
-    console.log("❌ AUDIO DOWNLOAD FAILED:", err.message);
-    reply("❌ Failed to download audio. Try again later.");
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error downloading audio.");
   }
-
-  break;
 }
+break;
 // ================= YTMP3 =================
 case 'ytmp3':
 case 'ytaudio': {
@@ -4295,6 +4222,562 @@ case 'web2zip': {
                 }
                 break;
             }
+// ================= EPLFIXTURES =================
+case 'eplfixtures': {
+    try {
+        const axios = require('axios');
+
+        const url = 'https://apiskeith.vercel.app/epl/upcomingmatches';
+        const { data } = await axios.get(url);
+
+        if (!data || !data.result || !data.result.upcomingMatches || !data.result.upcomingMatches.length) {
+            return reply("❌ No upcoming EPL matches found.");
+        }
+
+        const matches = data.result.upcomingMatches;
+
+        let text = `⚽ *EPL UPCOMING MATCHES*\n\n`;
+
+        matches.forEach((match, i) => {
+            text += `*${i + 1}. Matchday ${match.matchday}*\n`;
+            text += `🗓️ Date: ${match.date}\n`;
+            text += `🔵 Home: ${match.homeTeam}\n`;
+            text += `🔴 Away: ${match.awayTeam}\n`;
+            text += `──────────────\n`;
+        });
+
+        // Send all matches as one "card"
+        reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching EPL fixtures.");
+    }
+}
+break;
+// ================= PLAYER  =================
+case 'player': {
+    try {
+        const axios = require('axios');
+        const q = args.join(" ");
+        if (!q) return reply("⚽ Send player name!\nExample: player Ronaldo");
+
+        const url = `https://apiskeith.vercel.app/sport/playersearch?q=${encodeURIComponent(q)}`;
+        const { data } = await axios.get(url);
+
+        if (!data || !data.result || !data.result.length) {
+            return reply("❌ Player not found.");
+        }
+
+        // Send top 3 results one by one
+        const results = data.result.slice(0, 3);
+        for (let i = 0; i < results.length; i++) {
+            const player = results[i];
+
+            let caption = `*${i + 1}. ${player.name}*\n`;
+            caption += `🏟️ Team: ${player.team}\n`;
+            caption += `🌍 Nationality: ${player.nationality}\n`;
+            caption += `🎂 Birthdate: ${player.birthDate}\n`;
+            caption += `⚡ Status: ${player.status}\n`;
+            caption += `🎯 Position: ${player.position}\n`;
+            caption += `🔗 Sport: ${player.sport}\n`;
+
+            // Send image with caption (example for WhatsApp/Telegram)
+            if (player.thumbnail) {
+                await trashcore.sendMessage(
+                    m.chat, 
+                    { image: { url: player.thumbnail }, caption: caption }
+                );
+            } else {
+                // If no image, just send the text
+                reply(caption);
+            }
+        }
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching player data.");
+    }
+}
+break;
+// ================= CLUB  =================
+case 'club': {
+    try {
+        const axios = require('axios');
+        const q = args.join(" ");
+        if (!q) return reply("⚽ Send club name!\nExample: club Arsenal");
+
+        const url = `https://apiskeith.vercel.app/sport/teamsearch?q=${encodeURIComponent(q)}`;
+        const { data } = await axios.get(url);
+
+        if (!data || !data.result || !data.result.length) {
+            return reply("❌ Club not found.");
+        }
+
+        const team = data.result[0]; // Take the first match
+
+        let text = `🏆 *${team.name} (${team.shortName ?? ""})*\n`;
+        text += `📍 Location: ${team.location ?? "Unknown"}\n`;
+        text += `🌍 Country: ${team.country ?? "Unknown"}\n`;
+        text += `⚽ Sport: ${team.sport ?? "Unknown"}\n`;
+        text += `🏟️ Stadium: ${team.stadium ?? "Unknown"}\n`;
+        text += `🪙 Founded: ${team.formedYear ?? "Unknown"}\n`;
+        text += `🎨 Colors: Primary ${team.colors?.primary ?? "N/A"}, Secondary ${team.colors?.secondary ?? "N/A"}\n`;
+        text += `🔗 Website: ${team.social?.website ?? "N/A"}\n\n`;
+        text += `📖 Description:\n${team.description?.substring(0, 500) ?? "No description"}...\n\n`; // Shorten if too long
+
+        // Send badge or fanart images (first 3 fanart images if available)
+        let images = team.fanArt?.slice(0, 3) || [team.badges?.large, team.badges?.small].filter(Boolean);
+
+        if (images.length) {
+            // Example for WhatsApp/Telegram using a media sending function
+            for (let img of images) {
+                await trashcore.sendMessage(m.chat, { image: { url: img }, caption: text });
+                text = ""; // Only send caption on first image
+            }
+        } else {
+            reply(text);
+        }
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching club data.");
+    }
+}
+break;
+// ================= EPLSTANDINGS  =================
+case 'eplstandings': {
+    try {
+        const axios = require('axios');
+        const url = 'https://apiskeith.vercel.app/epl/standings';
+        const { data } = await axios.get(url);
+
+        if (!data || !data.result || !data.result.standings || !data.result.standings.length) {
+            return reply("❌ EPL standings not found.");
+        }
+
+        const standings = data.result.standings;
+
+        let text = `🏆 *Premier League Standings (Points Only)*\n\n`;
+
+        standings.forEach(team => {
+            text += `*${team.position}. ${team.team}* - *${team.points} points*\n`;
+        });
+
+       m.reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching EPL standings.");
+    }
+}
+break;
+// ================= EPLTOPSCORERS  =================
+case 'epltopscorers': {
+    try {
+        const axios = require('axios');
+        const url = 'https://apiskeith.vercel.app/epl/scorers';
+        const { data } = await axios.get(url);
+
+        if (!data || !data.result || !data.result.topScorers || !data.result.topScorers.length) {
+            return reply("❌ No top scorers found.");
+        }
+
+        const scorers = data.result.topScorers;
+
+        let text = `⚽ *EPL Top Scorers*\n\n`;
+
+        scorers.forEach((player) => {
+            text += `*${player.rank}. ${player.player}*\n`;
+            text += `🏟️ Team: ${player.team}\n`;
+            text += `🥅 Goals: ${player.goals}\n`;
+            text += `🎯 Assists: ${player.assists}\n`;
+            text += `⚡ Penalties: ${player.penalties}\n`;
+            text += `──────────────\n`;
+        });
+
+        m.reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching EPL top scorers.");
+    }
+}
+break;
+// ================= BundeFixtures  =================
+case 'bundesliga': {
+    try {
+        const axios = require('axios');
+        const url = 'https://apiskeith.vercel.app/bundesliga/upcomingmatches';
+        const { data } = await axios.get(url);
+
+        if (!data || !data.result || !data.result.upcomingMatches || !data.result.upcomingMatches.length) {
+            return reply("❌ No Bundesliga upcoming matches found.");
+        }
+
+        const matches = data.result.upcomingMatches;
+
+        let text = `⚽ *BUNDESLIGA UPCOMING MATCHES*\n\n`;
+
+        matches.forEach((match, i) => {
+            text += `*${i + 1}. Matchday ${match.matchday}*\n`;
+            text += `🏟️ ${match.homeTeam} vs ${match.awayTeam}\n`;
+            text += `📅 Date: ${match.date}\n`;
+            text += `──────────────\n`;
+        });
+
+        m.reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching Bundesliga matches.");
+    }
+}
+break;
+// ================= Bundesligatable  =================
+case 'bundesligastats': {
+    try {
+        const axios = require('axios');
+        const url = 'https://apiskeith.vercel.app/bundesliga/standings';
+        const { data } = await axios.get(url);
+
+        if (!data || !data.result || !data.result.standings || !data.result.standings.length) {
+            return reply("❌ Bundesliga standings not found.");
+        }
+
+        const standings = data.result.standings;
+
+        let text = `⚽ *BUNDESLIGA POINTS TABLE*\n\n`;
+        standings.forEach(team => {
+            text += `*${team.position}. ${team.team}* - Points: *${team.points}*\n`;
+        });
+
+        m.reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching Bundesliga table.");
+    }
+}
+break;
+// ================= BUNDESLIGGA  =================
+case 'bundesligascores': {
+    try {
+        const axios = require('axios');
+        const url = 'https://apiskeith.vercel.app/bundesliga/scorers';
+        const { data } = await axios.get(url);
+
+        if (!data?.result?.topScorers?.length) {
+            return reply("❌ Bundesliga top scorers not found.");
+        }
+
+        const scorers = data.result.topScorers;
+
+        let text = `⚽ *BUNDESLIGA TOP SCORERS*\n\n`;
+
+        scorers.slice(0, 10).forEach(player => {
+            text += `*${player.rank}. ${player.player}*\n`;
+            text += `🏟️ Team: ${player.team}\n`;
+            text += `⚽ Goals: ${player.goals}\n`;
+            text += `🎯 Assists: ${player.assists}\n`;
+            text += `⚡ Penalties: ${player.penalties}\n`;
+            text += `──────────────\n`;
+        });
+
+        m.reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching Bundesliga top scorers.");
+    }
+}
+break;
+// ================= Laligamatches  =================
+case 'laligamatches': {
+    try {
+        const axios = require('axios');
+        const url = 'https://apiskeith.vercel.app/laliga/upcomingmatches';
+        const { data } = await axios.get(url);
+
+        if (!data?.result?.upcomingMatches?.length) {
+            return reply("❌ No upcoming La Liga matches found.");
+        }
+
+        let text = `⚽ *LA LIGA UPCOMING MATCHES*\n\n`;
+        data.result.upcomingMatches.forEach(match => {
+            text += `🏟 Matchday: ${match.matchday}\n`;
+            text += `🏠 Home: ${match.homeTeam}\n`;
+            text += `⚡ Away: ${match.awayTeam}\n`;
+            text += `🗓 Date: ${match.date}\n`;
+            text += `──────────────\n`;
+        });
+
+        reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching La Liga matches.");
+    }
+}
+break;
+// ================= Laligatable =================
+case 'laligatable': {
+    try {
+        const axios = require('axios');
+        const url = 'https://apiskeith.vercel.app/laliga/standings';
+        const { data } = await axios.get(url);
+
+        if (!data?.result?.standings?.length) {
+            return reply("❌ No La Liga standings found.");
+        }
+
+        let text = `📊 *LA LIGA POINTS*\n\n`;
+        data.result.standings.forEach(team => {
+            text += `${team.position}. ${team.team} — ${team.points} pts\n`;
+        });
+
+        reply(text);
+
+    } catch (e) {
+        console.error(e);
+        reply("❌ Error fetching La Liga points.");
+    }
+}
+break;
+// ================= Laligascores  =================
+case 'laligascorers': {
+  try {
+    const axios = require('axios');
+    const url = 'https://apiskeith.vercel.app/laliga/scorers';
+    const { data } = await axios.get(url);
+
+    // check that topScorers exists
+    if (!data?.result?.topScorers?.length) {
+      return reply("❌ No La Liga top scorers found.");
+    }
+
+    const scorers = data.result.topScorers;
+    let text = `⚽ *LA LIGA TOP SCORERS*\n\n`;
+
+    scorers.forEach(player => {
+      text += `*${player.rank}. ${player.player}* — ${player.team}\n`;
+      text += `Goals: ${player.goals}`;
+      if (player.assists != null) text += ` | Assists: ${player.assists}`;
+      if (player.penalties != null) text += ` | Penalties: ${player.penalties}`;
+      text += `\n──────────────\n`;
+    });
+
+    m.reply(text);
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error fetching La Liga top scorers.");
+  }
+}
+break;
+// ================= Ligue-1  =================
+case 'ligue-1': {
+  try {
+    const axios = require('axios');
+    const url = 'https://apiskeith.vercel.app/ligue1/upcomingmatches';
+    const { data } = await axios.get(url);
+
+    if (!data?.result?.upcomingMatches?.length) {
+      return reply("❌ No upcoming Ligue 1 matches found.");
+    }
+
+    const matches = data.result.upcomingMatches;
+    let text = `⚽ *LIGUE 1 UPCOMING MATCHES*\n\n`;
+
+    matches.forEach(match => {
+      text += `*Matchday ${match.matchday}*\n`;
+      text += `${match.homeTeam} 🆚 ${match.awayTeam}\n`;
+      text += `Date: ${match.date}\n──────────────\n`;
+    });
+
+    m.reply(text);
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error fetching Ligue 1 matches.");
+  }
+}
+break;
+// ================= Ligue1table =================
+case 'ligue1table': {
+  try {
+    const axios = require('axios');
+    const url = 'https://apiskeith.vercel.app/ligue1/standings';
+    const { data } = await axios.get(url);
+
+    if (!data?.result?.standings?.length) {
+      return reply("❌ No Ligue 1 standings found.");
+    }
+
+    const standings = data.result.standings;
+    let text = `📊 *LIGUE 1 STANDINGS*\n\n`;
+
+    standings.forEach(team => {
+      text += `${team.position}. ${team.team} - ${team.points} pts\n`;
+    });
+
+    reply(text);
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error fetching Ligue 1 standings.");
+  }
+}
+break;
+// ================= Liguescorers  =================
+case 'liguescorers': {
+  try {
+    const axios = require('axios');
+    const url = 'https://apiskeith.vercel.app/ligue1/scorers';
+    const { data } = await axios.get(url);
+
+    if (!data?.result?.topScorers?.length) {
+      return reply("❌ No Ligue 1 top scorers found.");
+    }
+
+    const scorers = data.result.topScorers;
+    let text = `⚽ *LIGUE 1 TOP SCORERS*\n\n`;
+    scorers.slice(0, 10).forEach(player => {
+      text += `*${player.rank}. ${player.player}* — ${player.team}\n`;
+      text += `Goals: ${player.goals}`;
+      if (player.assists != null) text += ` | Assists: ${player.assists}`;
+      if (player.penalties != null) text += ` | Penalties: ${player.penalties}`;
+      text += `\n──────────────\n`;
+    });
+
+    m.reply(text);
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error fetching Ligue 1 top scorers.");
+  }
+}
+break;
+// ================= SeriaA  =================
+case 'serieamatches': {
+  try {
+    const axios = require('axios');
+    const url = 'https://apiskeith.vercel.app/seriea/upcomingmatches';
+    const { data } = await axios.get(url);
+
+    if (!data?.result?.upcomingMatches?.length) {
+      return reply("❌ No upcoming Serie A matches found.");
+    }
+
+    const matches = data.result.upcomingMatches;
+    let text = `⚽ *SERIE A UPCOMING MATCHES*\n\n`;
+
+    matches.forEach((match, i) => {
+      text += `*${i + 1}. Matchday ${match.matchday}*\n`;
+      text += `🏠 ${match.homeTeam} vs ${match.awayTeam}\n`;
+      text += `🗓 Date: ${match.date}\n`;
+      text += `──────────────\n`;
+    });
+
+    m.reply(text);
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error fetching Serie A matches.");
+  }
+}
+break;
+// ================= Seriastats  =================
+case 'serieastats': {
+  try {
+    const axios = require('axios');
+    const url = 'https://apiskeith.vercel.app/seriea/standings';
+    const { data } = await axios.get(url);
+
+    if (!data?.result?.standings?.length) {
+      return reply("❌ No Serie A standings found.");
+    }
+
+    const standings = data.result.standings;
+    let text = `📊 *SERIE A TABLE (Points Only)*\n\n`;
+
+    standings.forEach(team => {
+      text += `${team.position}. ${team.team} – ${team.points} pts\n`;
+    });
+
+    reply(text);
+
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error fetching Serie A standings.");
+  }
+}
+break;
+// ================= SERIEA  =================
+case 'serieascorers': {
+  try {
+    const axios = require('axios');
+    const url = 'https://apiskeith.vercel.app/seriea/scorers';
+    const { data } = await axios.get(url);
+
+    if (!data?.result?.topScorers?.length) {
+      return reply("❌ No Serie A top scorers found.");
+    }
+
+    const scorers = data.result.topScorers;
+    let text = `⚽ *SERIE A TOP SCORERS*\n\n`;
+
+    scorers.slice(0, 10).forEach(player => {
+      text += `*${player.rank}. ${player.player}* — ${player.team}\n`;
+      text += `Goals: ${player.goals}`;
+      if (player.assists != null) text += ` | Assists: ${player.assists}`;
+      if (player.penalties != null) text += ` | Penalties: ${player.penalties}`;
+      text += `\n──────────────\n`;
+    });
+
+    m.reply(text);
+  } catch (e) {
+    console.error(e);
+    reply("❌ Error fetching Serie A top scorers.");
+  }
+}
+break;
+// ================= LIVESCORE  =================
+case 'livescore': {
+    try {
+        const axios = require('axios');
+
+        const url = "https://apiskeith.vercel.app/livescore";
+        const { data } = await axios.get(url);
+
+        if (!data.status || !data.result || !data.result.response.length) {
+            return reply("⚠️ No live matches found.");
+        }
+
+        const matches = data.result.response;
+
+        let text = `🏆 *LIVE FOOTBALL SCORES*\n\n`;
+
+        matches.forEach((match, i) => {
+            const league = match.league?.name ?? "Unknown League";
+            const home = match.teams?.home?.name ?? "Home Team";
+            const away = match.teams?.away?.name ?? "Away Team";
+            const scoreHome = match.goals?.home ?? 0;
+            const scoreAway = match.goals?.away ?? 0;
+            const minute = match.fixture?.status?.elapsed ?? 0;
+            const status = match.fixture?.status?.long ?? "Unknown";
+
+            text += `${i + 1}. ${league}\n`;
+            text += `🏟️ Match: ${home} vs ${away}\n`;
+            text += `⏱️ Minute: ${minute}\n`;
+            text += `📊 Score: ${scoreHome} - ${scoreAway}\n`;
+            text += `📡 Status: ${status}\n`;
+            text += `──────────────\n`;
+        });
+
+        await trashcore.sendMessage(m.chat, { text }, { quoted: m });
+
+    } catch (err) {
+        console.log(err);
+        reply("❌ Error fetching live scores.");
+    }
+}
+break;
 // ================= GET CASE  =================
 case 'getcase': {
 if (!isOwner) return reply("❌ Owner-only command.");
@@ -5413,59 +5896,42 @@ case 'copilot': {
     }
     break;
 }
+
 // =================FANCY =================
 case 'fancy': {
-    try {
-        if (!args[0]) return reply('⚠️ Please provide a text!\n\nExample:\n.fancy Hello World');
+  try {
+    const axios = require('axios');
 
-        const text = args.join(' ');
+    if (!text) return reply("⚠️ Please provide text to fancy!\nUsage: *.fancy hello*");
 
-        // 30 distinct fancy style functions
-        const styles = [
-            (t) => t.toUpperCase(),
-            (t) => t.toLowerCase(),
-            (t) => t.split('').reverse().join(''),                              // reversed
-            (t) => t.split('').map(c => c + '̶').join(''),                      // strikethrough
-            (t) => t.split('').map(c => `*${c}*`).join(''),                     // pseudo-bold
-            (t) => t.split('').map(c => `~${c}~`).join(''),                     // wave
-            (t) => t.split('').map(c => '•'+c+'•').join(''),                    // dotted
-            (t) => t.split('').map(c => c + '̄').join(''),                      // macron
-            (t) => t.split('').map(c => c + '̣').join(''),                      // dot below
-            (t) => t.split('').map(c => c + '̃').join(''),                      // tilde above
-            (t) => t.split('').map(c => c + '́').join(''),                      // acute accent
-            (t) => t.split('').map(c => c + '̀').join(''),                      // grave accent
-            (t) => t.split('').map(c => c + '̈').join(''),                      // diaeresis
-            (t) => t.split('').map(c => c + '̌').join(''),                      // caron
-            (t) => t.split('').map(c => c + '̇').join(''),                      // dot above
-            (t) => t.split('').map(c => c + '̓').join(''),                      // reversed comma above
-            (t) => t.split('').map(c => c + '̔').join(''),                      // reversed apostrophe
-            (t) => t.split('').map(c => c + '̛').join(''),                      // hook above
-            (t) => t.split('').map(c => c + '͌').join(''),                      // tilde overlay
-            (t) => t.split('').map(c => c + '͐').join(''),                      // inverted breve
-            (t) => t.split('').map(c => c + '͂').join(''),                      // circumflex
-            (t) => t.split('').map(c => c + '̋').join(''),                      // double acute
-            (t) => t.split('').map(c => c + '̏').join(''),                      // inverted double acute
-            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D400 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // bold unicode
-            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D434 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // italic
-            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D49C + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // script
-            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D504 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // fraktur
-            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x1D538 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // double-struck
-            (t) => t.split('').map(c => c.replace(/[a-zA-Z]/g, c => String.fromCharCode(0x24B6 + (c.toUpperCase().charCodeAt(0)-65)))).join(''), // circled
-        ];
+    await trashcore.sendMessage(m.chat, { react: { text: "⏳", key: m.key } });
 
-        // generate 30 unique styles
-        const results = styles.map((styleFn, index) => `${index + 1}. ${styleFn(text)}`);
+    const res = await axios.get(`https://apiskeith.vercel.app/fancytext/styles?q=${encodeURIComponent(text.trim())}`);
+    const styles = res.data.styles; // Array of style objects
 
-        await reply(results.join('\n\n'));
-
-    } catch (err) {
-        console.error("Fancy command error:", err);
-        await reply(`❌ Error: ${err.message}`);
+    if (!styles || !styles.length) {
+      return reply("❌ No fancy styles found for this text.");
     }
-    break;
+
+    // Format all styles into a single message
+    let message = `✨ *Fancy Styles for:* "${text.trim()}"\n\n`;
+    styles.forEach((item, index) => {
+      if (item.result && item.result.trim()) {
+        message += `${index + 1}. ${item.name}: ${item.result}\n`;
+      }
+    });
+
+    reply(message);
+
+    await trashcore.sendMessage(m.chat, { react: { text: "✅", key: m.key } });
+  } catch (err) {
+    console.error("❌ Fancy Styles Error:", err);
+    reply("💥 Failed to generate fancy styles. Please try again later.");
+    await trashcore.sendMessage(m.chat, { react: { text: "❌", key: m.key } });
+  }
+  break;
 }
-
-
+// =================Take =================
 case 'take': {
   try {
     const { downloadContentFromMessage } = require('@whiskeysockets/baileys');

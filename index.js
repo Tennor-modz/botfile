@@ -23,7 +23,7 @@ const {
   makeInMemoryStore,
   downloadContentFromMessage,
   jidDecode
-} = require('@whiskeysockets/baileys');
+} = require('@trashcore/baileys');
 
 const handleCommand = require('./case');
 const config = require('./config');

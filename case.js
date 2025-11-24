@@ -94,17 +94,72 @@ const isOwner = senderJid === botNumber;
 
     const time = new Date().toLocaleTimeString();
    
-console.log(
-  chalk.bgHex('#8B4513').white.bold(`
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📥 INCOMING MESSAGE (${time})
-👤 From: ${pushname} (${participant})
-💬 Chat Type: ${chatType} - ${chatName}
-🏷️ Command: ${command || "—"}
-💭 Message: ${body || "—"}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`)
-);
+if (m.message) {
+  const isGroupMsg = m.isGroup;
+  const body = m.body || m.messageStubType || "—";
+  const pushnameDisplay = m.pushName || "Unknown";
+  const command = body.startsWith(prefix) ? body.split(' ')[0] : null;
+
+  // 🕒 Time in EAT
+  const date = new Date().toLocaleString("en-KE", {
+    timeZone: "Africa/Nairobi",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  const hour = new Date().toLocaleString("en-KE", {
+    timeZone: "Africa/Nairobi",
+    hour: "2-digit",
+    hour12: false,
+  });
+  const hourInt = parseInt(hour, 10);
+  const ucapanWaktu =
+    hourInt < 12
+      ? "Good Morning ☀️"
+      : hourInt < 18
+      ? "Good Afternoon 🌤️"
+      : "Good Evening 🌙";
+
+  // 🎨 Colors
+  const headerColor = chalk.black.bold.bgHex("#ff5e78");  // Pink header
+  const subHeaderColor = chalk.white.bold.bgHex("#4a69bd"); // Blue header
+  const bodyColor = chalk.black.bgHex("#fdcb6e"); // Yellow box
+
+  // 🏠 Fetch group metadata if group message safely
+  let groupName = "";
+  if (isGroupMsg) {
+    try {
+      const groupMetadata = await trashcore.groupMetadata(m.chat).catch(() => null);
+      groupName = groupMetadata?.subject || "Unknown Group";
+    } catch {
+      groupName = "Unknown Group";
+    }
+  }
+
+  // 🧾 Log output
+  console.log(headerColor(`\n🌟 ${ucapanWaktu} 🌟`));
+  console.log(
+    subHeaderColor(
+      `🚀 ${isGroupMsg ? "GROUP MESSAGE RECEIVED" : "PRIVATE MESSAGE RECEIVED"} 🚀`
+    )
+  );
+
+  const info = `
+📅 DATE (EAT): ${date}
+💬 MESSAGE: ${body}
+🗣️ SENDERNAME: ${pushnameDisplay}
+👤 JID: ${m.sender}
+${isGroupMsg ? `🏠 GROUP: ${groupName}` : ""}
+`;
+
+  console.log(bodyColor(info));
+}
 // --- 🚨 ANTILINK 2.0 AUTO CHECK ---
 if (isGroup && global.settings?.antilink?.[from]?.enabled) {
   const settings = global.settings.antilink[from];
@@ -793,7 +848,7 @@ case 'setmenuvideo': {
 
 // ================= VV =================
 case 'vv': {
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const { downloadContentFromMessage } = require('@trashcore/baileys');
     try {
         if (!m.quoted) return reply('⚠️ Please reply to a *view once* message!');
         
@@ -1760,7 +1815,7 @@ case 'enc':
 case 'encrypt': {
   try {
     const JsConfuser = require('js-confuser');
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const fs = require('fs');
 
     // Ensure we have a quoted message
@@ -2227,7 +2282,7 @@ case 'tourl': {
     const { tmpdir } = require('os');
     const axios = require('axios');
     const FormData = require('form-data');
-    const { downloadContentFromMessage, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage, generateWAMessageFromContent } = require('@trashcore/baileys');
 
     // 🧩 Detect quoted or direct media
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -2325,7 +2380,7 @@ case 'url': {
     const { tmpdir } = require('os');
     const axios = require('axios');
     const FormData = require('form-data');
-    const { downloadContentFromMessage, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage, generateWAMessageFromContent } = require('@trashcore/baileys');
 
     // Get quoted or direct media
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -2418,7 +2473,7 @@ case 'url': {
 case 'shazam': {
   try {
     const axios = require('axios');
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
 
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const msg = (quotedMsg && (quotedMsg.audioMessage || quotedMsg.voiceMessage)) || m.message?.audioMessage || m.message?.voiceMessage;
@@ -2470,7 +2525,7 @@ case 'tovideo': {
     const FormData = require("form-data");
     const path = require("path");
     const { tmpdir } = require("os");
-    const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
+    const { downloadContentFromMessage } = require("@trashcore/baileys");
 
     // 🧩 Function to convert WebP → MP4 using ezgif.com
     async function webp2mp4File(filepath) {
@@ -2557,7 +2612,7 @@ case 'ocr':
 case 'readtext': {
   try {
     const axios = require("axios");
-    const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
+    const { downloadContentFromMessage } = require("@trashcore/baileys");
 
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const msg =
@@ -2851,7 +2906,7 @@ case 'listinactive': {
 // ================= SETDP=================
 case 'setdp': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const fs = require('fs');
     const path = require('path');
     const tmp = require('os').tmpdir();
@@ -2892,7 +2947,7 @@ case 'fast':
 case 'deep':
 case 'bass': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const ffmpeg = require('fluent-ffmpeg');
     const fs = require('fs');
     const { tmpdir } = require('os');
@@ -2957,7 +3012,7 @@ case 'bass': {
 
 case 'convertphoto': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const fs = require('fs');
     const path = require('path');
     const { tmpdir } = require('os');
@@ -3697,7 +3752,7 @@ case 'video': {
 
 case 'menu2':
 case 'help2': {
-  const { generateWAMessageContent, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+  const { generateWAMessageContent, generateWAMessageFromContent } = require('@trashcore/baileys');
 
   try {
     const categories = [
@@ -5012,7 +5067,7 @@ case 'getfile': {
 // ================= TO AUDIO  =================
 case 'toaudio': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const ffmpeg = require('fluent-ffmpeg');
     const fs = require('fs');
     const { tmpdir } = require('os');
@@ -5069,7 +5124,7 @@ case 'toaudio': {
 // ================= TO VOICE NOTE  =================
 case 'tovoicenote': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const ffmpeg = require('fluent-ffmpeg');
     const fs = require('fs');
     const path = require('path');
@@ -5128,7 +5183,7 @@ case 'tovoicenote': {
 // ================= TO IMAGE =================
 case 'toimage': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const fs = require('fs');
     const path = require('path');
     const { tmpdir } = require('os');
@@ -5262,15 +5317,9 @@ case 'playdoc': {
 // ================= ANTILINK =================
 case 'antilink': {
   try {
-const sender = isGroup ? m.key.participant : m.key.remoteJid;
-const groupMetadata = await trashcore.groupMetadata(m.chat).catch(() => null);
-
-const groupAdmins = groupMetadata?.participants?.map(p => ({
-  id: p.id,
-  isAdmin: ['admin', 'superadmin'].includes(p.admin)
-}))?.filter(p => p.isAdmin)?.map(p => p.id) || [];
-
-const isAdmin = groupMetadata?.participants?.find(p => p.id === sender)?.admin !== undefined;
+const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
+const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
+const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
     if (!isGroup) return reply("⚠️ This command only works in groups!");
      if (!isOwner) return reply("⚠️ Only the bot owner can toggle antilink!");
     const option = args[0]?.toLowerCase();
@@ -5934,7 +5983,7 @@ case 'fancy': {
 // =================Take =================
 case 'take': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const fs = require('fs');
     const path = require('path');
     const { tmpdir } = require('os');
@@ -5976,7 +6025,7 @@ case 'take': {
 case 's': 
 case 'sticker': {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+    const { downloadContentFromMessage } = require('@trashcore/baileys');
     const fs = require('fs');
     const path = require('path');
     const { tmpdir } = require('os');

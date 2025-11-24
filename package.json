@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@trashcore/baileys":"github:Tennor-modz/MD-Baileys",
+    "@trashcore/baileys":"latest",
     "pino": "^8.0.0",
     "axios": "^0.27.2",
     "chalk": "^4.1.2",

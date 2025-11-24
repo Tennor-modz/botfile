@@ -1,7 +1,7 @@
 // antiDelete.js
 const fs = require('fs');
 const path = require('path');
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const { downloadContentFromMessage } = require('@trashcore/baileys');
 
 module.exports = function initAntiDelete(trashcore, opts = {}) {
   const LIB_DIR = path.join(__dirname, './library');

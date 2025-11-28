@@ -16,14 +16,12 @@ const axios = require('axios');
 const yts = require("yt-search");
 const { igdl } = require("btch-downloader");
 const util = require('util');
-const fetch = require('node-fetch');
 const { exec } = require('child_process');
 const path = require('path');
 const chalk = require('chalk');
 const os = require('os');
 const { writeFile } = require('./library/utils');
 const { saveSettings,loadSettings } = require('./settingsManager');
-const { fetchJson } = require('./library/fetch'); 
 // =============== COLORS ===============
 const colors = {
     reset: "\x1b[0m",
@@ -5925,27 +5923,55 @@ const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
 }
 // ================= COPILOT ================
 case 'copilot': {
-    try {
-        if (!args[0]) return reply('⚠️ Please provide a query!\n\nExample:\n.copilot what is JavaScript?');
+  try {
+    const axios = require("axios");
 
-        const query = encodeURIComponent(args.join(' '));
-        const url = `https://api.nekolabs.my.id/ai/copilot?text=${query}`;
+    const text = args.join(" ") || (m.quoted && m.quoted.text);
+    if (!text) return reply(`Example: ${prefix + command} Advantages of Titan Elite Keyboard`);
 
-        const { data } = await axios.get(url);
+    // React loading
+    await trashcore.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
 
-        if (data?.result?.text) {
-            await reply(data.result.text);
-        } else {
-            await reply("❌ Failed to get a response from the AI.");
-        }
+    const url = `https://theresapis.vercel.app/ai/copilot?message=${encodeURIComponent(text)}&model=gpt-5`;
 
-    } catch (err) {
-        console.error("Copilot command error:", err);
-        await reply(`❌ Error: ${err.message}`);
+    const response = await axios.get(url, {
+      headers: { "Accept": "application/json" }
+    });
+
+    const j = response.data;
+
+    if (!j?.status || !j?.result) {
+      return reply(`🍂 An error occurred while processing your request.`);
     }
-    break;
-}
 
+    const answer = j.result.text || 'No result.';
+    const cites = j.result.citations || [];
+
+    let caption = `🤖 *COPILOT Response*\n\n`;
+    caption += `${answer}\n\n`;
+
+    if (cites.length > 0) {
+      caption += `🔗 *References:*\n`;
+      for (let i of cites.slice(0, 10)) {
+        caption += `• *${i.title}*\n${i.url}\n\n`;
+      }
+    }
+
+    await trashcore.sendMessage(
+      m.chat,
+      { text: caption },
+      { quoted: m.quoted ? m.quoted : m }
+    );
+
+  } catch (e) {
+    console.error(e);
+    await reply(`🍂 Internal error, please try again.`);
+  } finally {
+    await trashcore.sendMessage(m.chat, { react: { text: '', key: m.key } });
+  }
+
+  break;
+}
 // =================FANCY =================
 case 'fancy': {
   try {

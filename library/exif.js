@@ -1,159 +1,149 @@
-const fs = require('fs');
+const fs = require("fs");
 const { tmpdir } = require("os");
 const Crypto = require("crypto");
-const ff = require('fluent-ffmpeg');
+const ffmpeg = require("fluent-ffmpeg");
 const webp = require("node-webpmux");
 const path = require("path");
 
-// 🔹 Convert Image → WebP
-async function imageToWebp(media) {
-  const tmpFileIn = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.jpg`);
-  const tmpFileOut = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  fs.writeFileSync(tmpFileIn, media);
+// 💠 Generate temp path
+const tempFile = (ext) =>
+  path.join(tmpdir(), `${Crypto.randomBytes(8).toString("hex")}.${ext}`);
 
-  await new Promise((resolve, reject) => {
-    ff(tmpFileIn)
-      .on("error", reject)
-      .on("end", resolve)
-      .addOutputOptions([
-        "-vcodec", "libwebp",
-        "-vf",
-        "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15," +
-        "pad=320:320:-1:-1:color=white@0.0,split[a][b];" +
-        "[a]palettegen=reserve_transparent=on:transparency_color=ffffff[p];" +
-        "[b][p]paletteuse"
-      ])
-      .toFormat("webp")
-      .save(tmpFileOut);
-  });
-
-  const buff = fs.readFileSync(tmpFileOut);
-  fs.unlinkSync(tmpFileOut);
-  fs.unlinkSync(tmpFileIn);
-  return buff;
+// 💠 Ensure file is fully written (Heroku fix)
+function ensureValid(file) {
+  if (!fs.existsSync(file)) throw new Error("Temp file missing");
+  const size = fs.statSync(file).size;
+  if (size < 1000) throw new Error("Corrupted output (Heroku truncated file)");
 }
 
-// 🔹 Convert Video → WebP
-async function videoToWebp(media) {
-  const tmpFileIn = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.mp4`);
-  const tmpFileOut = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  fs.writeFileSync(tmpFileIn, media);
+// ==========================================================
+// 🔵 IMAGE → WEBP
+// ==========================================================
+async function imageToWebp(buffer) {
+  const input = tempFile("jpg");
+  const output = tempFile("webp");
+
+  fs.writeFileSync(input, buffer);
 
   await new Promise((resolve, reject) => {
-    ff(tmpFileIn)
+    ffmpeg(input)
       .on("error", reject)
       .on("end", resolve)
       .addOutputOptions([
         "-vcodec", "libwebp",
         "-vf",
-        "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15," +
-        "pad=320:320:-1:-1:color=white@0.0,split[a][b];" +
-        "[a]palettegen=reserve_transparent=on:transparency_color=ffffff[p];" +
-        "[b][p]paletteuse",
+          "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease," +
+          "fps=15,pad=320:320:-1:-1:color=white@0.0",
+      ])
+      .toFormat("webp")
+      .save(output);
+  });
+
+  ensureValid(output);
+
+  const result = fs.readFileSync(output);
+  fs.unlinkSync(input);
+  fs.unlinkSync(output);
+  return result;
+}
+
+// ==========================================================
+// 🔵 VIDEO → WEBP
+// ==========================================================
+async function videoToWebp(buffer) {
+  const input = tempFile("mp4");
+  const output = tempFile("webp");
+
+  fs.writeFileSync(input, buffer);
+
+  await new Promise((resolve, reject) => {
+    ffmpeg(input)
+      .on("error", reject)
+      .on("end", resolve)
+      .addOutputOptions([
+        "-vcodec", "libwebp",
+        "-vf",
+          "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease," +
+          "fps=15,pad=320:320:-1:-1:color=white@0.0",
         "-loop", "0",
-        "-ss", "00:00:00",
-        "-t", "00:00:05",
         "-preset", "default",
-        "-an", "-vsync", "0"
+        "-an",
       ])
       .toFormat("webp")
-      .save(tmpFileOut);
+      .save(output);
   });
 
-  const buff = fs.readFileSync(tmpFileOut);
-  fs.unlinkSync(tmpFileOut);
-  fs.unlinkSync(tmpFileIn);
-  return buff;
+  ensureValid(output);
+
+  const result = fs.readFileSync(output);
+  fs.unlinkSync(input);
+  fs.unlinkSync(output);
+  return result;
 }
 
-// 🔹 Write EXIF for Image
-async function writeExifImg(media, metadata) {
-  const isWebp = media.slice(0, 12).includes("WEBP");
-  const wMedia = isWebp ? media : await imageToWebp(media);
-
-  const tmpFileIn = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  const tmpFileOut = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  fs.writeFileSync(tmpFileIn, wMedia);
-
-  const img = new webp.Image();
-  await img.load(tmpFileIn);
-  fs.unlinkSync(tmpFileIn);
-
-  const exif = createExif(metadata);
-  img.exif = exif;
-  await img.save(tmpFileOut);
-
-  return tmpFileOut;
-}
-
-// 🔹 Write EXIF for Video
-async function writeExifVid(media, metadata) {
-  const isWebp = media.slice(0, 12).includes("WEBP");
-  const wMedia = isWebp ? media : await videoToWebp(media);
-
-  const tmpFileIn = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  const tmpFileOut = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  fs.writeFileSync(tmpFileIn, wMedia);
-
-  const img = new webp.Image();
-  await img.load(tmpFileIn);
-  fs.unlinkSync(tmpFileIn);
-
-  const exif = createExif(metadata);
-  img.exif = exif;
-  await img.save(tmpFileOut);
-
-  return tmpFileOut;
-}
-
-// 🔹 Auto Detect + Write EXIF
-async function writeExif(media, metadata) {
-  const mime = media.mimetype || '';
-  let wMedia;
-
-  if (/webp/.test(mime)) wMedia = media.data;
-  else if (/image/.test(mime)) wMedia = await imageToWebp(media.data);
-  else if (/video/.test(mime)) wMedia = await videoToWebp(media.data);
-  else throw new Error("Unsupported media type for EXIF");
-
-  const tmpFileIn = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  const tmpFileOut = path.join(tmpdir(), `${Crypto.randomBytes(6).toString("hex")}.webp`);
-  fs.writeFileSync(tmpFileIn, wMedia);
-
-  const img = new webp.Image();
-  await img.load(tmpFileIn);
-  fs.unlinkSync(tmpFileIn);
-
-  const exif = createExif(metadata);
-  img.exif = exif;
-  await img.save(tmpFileOut);
-
-  return tmpFileOut;
-}
-
-// 🔹 Helper to build EXIF buffer
-function createExif(metadata = {}) {
+// ==========================================================
+// 🔵 Create EXIF Buffer
+// ==========================================================
+function makeExif({ packname = "", author = "", categories = [""] }) {
   const json = {
-    "sticker-pack-id": "https://github.com/nazedev/naze",
-    "sticker-pack-name": metadata.packname || "",
-    "sticker-pack-publisher": metadata.author || "",
-    "emojis": metadata.categories || [""]
+    "sticker-pack-id": Crypto.randomBytes(8).toString("hex"),
+    "sticker-pack-name": packname,
+    "sticker-pack-publisher": author,
+    "emojis": categories,
   };
-  const exifAttr = Buffer.from([
-    0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00,
-    0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x16, 0x00, 0x00, 0x00,
-  ]);
+
   const jsonBuff = Buffer.from(JSON.stringify(json), "utf-8");
-  const exif = Buffer.concat([exifAttr, jsonBuff]);
-  exif.writeUIntLE(jsonBuff.length, 14, 4);
-  return exif;
+
+  const exifAttr = Buffer.from([
+    0x49, 0x49, 0x2A, 0x00,
+    0x08, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x41, 0x57,
+    0x07, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x16, 0x00, 0x00, 0x00,
+  ]);
+
+  exifAttr.writeUIntLE(jsonBuff.length, 14, 4);
+
+  return Buffer.concat([exifAttr, jsonBuff]);
 }
 
+// ==========================================================
+// 🔵 Write EXIF to WEBP (image or video)
+// ==========================================================
+async function writeExifBuffer(webpBuffer, metadata) {
+  const exif = makeExif(metadata);
+
+  const img = new webp.Image();
+  await img.load(webpBuffer);
+  img.exif = exif;
+
+  return await img.save(null); // return buffer
+}
+
+// ==========================================================
+// 🔵 Auto Detect & Process EXIF
+// ==========================================================
+async function writeExifAuto(buffer, mime, metadata) {
+  let webpBuf;
+
+  if (mime.includes("webp")) {
+    webpBuf = buffer;
+  } else if (mime.includes("image")) {
+    webpBuf = await imageToWebp(buffer);
+  } else if (mime.includes("video")) {
+    webpBuf = await videoToWebp(buffer);
+  } else {
+    throw new Error("Unsupported media type for EXIF");
+  }
+
+  return await writeExifBuffer(webpBuf, metadata);
+}
+
+// EXPORTS
 module.exports = {
   imageToWebp,
   videoToWebp,
-  writeExifImg,
-  writeExifVid,
-  writeExif,
+  writeExifBuffer,
+  writeExifAuto,
 };

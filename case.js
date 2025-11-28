@@ -4230,51 +4230,96 @@ case 'web2zip': {
 }
             // ================= PLAY =================
             case 'play': {
-                try {
-                    const tempDir = path.join(__dirname, "temp");
-                    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+    try {
+        const tempDir = path.join(__dirname, "temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-                    if (!args.length) return reply(`🎵 Provide a song name!\nExample: ${command} Not Like Us`);
+        if (!args.length)
+            return reply(`🎵 Provide a song name!\nExample: ${command} Not Like Us`);
 
-                    const query = args.join(" ");
-                    if (query.length > 100) return reply(`📝 Song name too long! Max 100 chars.`);
+        const query = args.join(" ");
+        if (query.length > 100)
+            return reply(`📝 Song name too long! Max 100 chars.`);
 
-                    await reply("🎧 Searching for the track... ⏳");
+        await reply("🎧 Searching for the track... ⏳");
 
-                    const searchResult = await (await yts(`${query} official`)).videos[0];
-                    if (!searchResult) return reply("😕 Couldn't find that song. Try another one!");
+        // Search YouTube
+        const searchResult = (await yts(`${query} official`)).videos[0];
+        if (!searchResult)
+            return reply("😕 Couldn't find that song. Try another one!");
 
-                    const video = searchResult;
-                    const apiUrl = `https://api.privatezia.biz.id/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`;
-                    const response = await axios.get(apiUrl);
-                    const apiData = response.data;
+        const video = searchResult;
 
-                    if (!apiData.status || !apiData.result || !apiData.result.downloadUrl) throw new Error("API failed to fetch track!");
+        // Thumbnail fix
+        const thumbnail =
+            video.thumbnail ||
+            (video.thumbnails && video.thumbnails.length > 0
+                ? video.thumbnails[0].url
+                : null);
 
-                    const timestamp = Date.now();
-                    const fileName = `audio_${timestamp}.mp3`;
-                    const filePath = path.join(tempDir, fileName);
+        // API request for MP3
+        const apiUrl = `https://api.privatezia.biz.id/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`;
+        const response = await axios.get(apiUrl);
+        const apiData = response.data;
 
-                    // Download MP3
-                    const audioResponse = await axios({ method: "get", url: apiData.result.downloadUrl, responseType: "stream", timeout: 600000 });
-                    const writer = fs.createWriteStream(filePath);
-                    audioResponse.data.pipe(writer);
-                    await new Promise((resolve, reject) => { writer.on("finish", resolve); writer.on("error", reject); });
+        if (!apiData.status || !apiData.result || !apiData.result.downloadUrl)
+            throw new Error("API failed to fetch track!");
 
-                    if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) throw new Error("Download failed or empty file!");
+        const timestamp = Date.now();
+        const fileName = `audio_${timestamp}.mp3`;
+        const filePath = path.join(tempDir, fileName);
 
-                    await trashcore.sendMessage(from, { text: stylishReply(`🎶 Playing *${apiData.result.title || video.title}* 🎧`) }, { quoted: m });
-                    await trashcore.sendMessage(from, { audio: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.result.title || video.title).substring(0, 100)}.mp3` }, { quoted: m });
+        // Download audio file
+        const audioResponse = await axios({
+            method: "get",
+            url: apiData.result.downloadUrl,
+            responseType: "stream",
+            timeout: 600000,
+        });
 
-                    // Cleanup
-                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        const writer = fs.createWriteStream(filePath);
+        audioResponse.data.pipe(writer);
 
-                } catch (error) {
-                    console.error("Play command error:", error);
-                    return reply(`💥 Error: ${error.message}`);
-                }
-                break;
-            }
+        await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+        });
+
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0)
+            throw new Error("Download failed or empty file!");
+
+        // Send thumbnail + title
+        await trashcore.sendMessage(
+            from,
+            {
+                image: { url: thumbnail },
+                caption: stylishReply(
+                    `🎶 Playing *${apiData.result.title || video.title}* 🎧`
+                ),
+            },
+            { quoted: m }
+        );
+
+        // Send audio
+        await trashcore.sendMessage(
+            from,
+            {
+                audio: { url: filePath },
+                mimetype: "audio/mpeg",
+                fileName: `${(apiData.result.title || video.title).substring(0, 100)}.mp3`,
+            },
+            { quoted: m }
+        );
+
+        // Delete temp file
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    } catch (error) {
+        console.error("Play command error:", error);
+        return reply(`💥 Error: ${error.message}`);
+    }
+    break;
+}
 // ================= EPLFIXTURES =================
 case 'eplfixtures': {
     try {
@@ -6048,15 +6093,16 @@ case 'take': {
   break;
 }
             // ================STICKER=================
-case 's': 
+case 's':
 case 'sticker': {
   try {
     const { downloadContentFromMessage } = require('@trashcore/baileys');
     const fs = require('fs');
     const path = require('path');
     const { tmpdir } = require('os');
-    const ffmpeg = require('fluent-ffmpeg');
-    const { imageToWebp, videoToWebp, writeExifImg, writeExifVid } = require('./library/exif');
+    // updated exports from your new exif module
+    const { imageToWebp, videoToWebp, writeExifBuffer, writeExifAuto } = require('./library/exif');
+
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const msg =
       (quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage)) ||
@@ -6064,7 +6110,9 @@ case 'sticker': {
       m.message?.videoMessage;
 
     if (!msg) {
-      return reply(`⚠️ Reply to an *image* or *video* with caption *${command}*\n\n🎥 *Max Video Duration:* 30 seconds`);
+      return reply(
+        `⚠️ Reply to an *image* or *video* with caption *${command}*\n\n🎥 *Max Video Duration:* 30 seconds`
+      );
     }
 
     const mime = msg.mimetype || '';
@@ -6072,37 +6120,39 @@ case 'sticker': {
       return reply(`⚠️ Only works on *image* or *video* messages!`);
     }
 
-    // ⏳ Duration check
+    // ⏳ Duration check (if video metadata available)
     if (msg.videoMessage && msg.videoMessage.seconds > 30) {
       return reply("⚠️ Maximum video duration is 30 seconds!");
     }
 
     reply("🪄 Creating your sticker...");
 
-    // ✅ Download the media
+    // ✅ Download the media into a buffer safely
     const stream = await downloadContentFromMessage(msg, mime.split('/')[0]);
-    let buffer = Buffer.from([]);
-    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-    let webpPath;
-    if (/image/.test(mime)) {
-      webpPath = await writeExifImg(buffer, {
-        packname: config.PACK_NAME || "Trashcore Stickers",
-        author: config.AUTHOR || "Trashcore",
-      });
-    } else {
-      webpPath = await writeExifVid(buffer, {
-        packname: config.PACK_NAME || "Trashcore Stickers",
-        author: config.AUTHOR || "Trashcore",
-      });
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    const buffer = Buffer.concat(chunks);
+
+    // Basic integrity check
+    if (!buffer || buffer.length < 5000) {
+      return reply("⚠️ Failed to download media properly (file too small). Try again.");
     }
 
-    // ✅ Read final webp buffer
-    const stickerBuffer = fs.readFileSync(webpPath);
+    // Use the new writeExifAuto which returns a Buffer (webp with exif)
+    const stickerBuffer = await writeExifAuto(buffer, mime, {
+      packname: config.PACK_NAME || "Trashcore Stickers",
+      author: config.AUTHOR || "Trashcore",
+    });
 
+    // Final check
+    if (!stickerBuffer || !(stickerBuffer instanceof Buffer) || stickerBuffer.length < 1000) {
+      return reply("⚠️ Failed to create sticker (invalid output).");
+    }
+
+    // Send sticker (Buffer)
     await trashcore.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m });
 
-    // ✅ Cleanup temp
-    fs.unlinkSync(webpPath);
+    // done
   } catch (err) {
     console.error("❌ sticker error:", err);
     reply(`💥 Failed to create sticker:\n${err.message}`);

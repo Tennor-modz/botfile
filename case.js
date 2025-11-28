@@ -6097,11 +6097,8 @@ case 's':
 case 'sticker': {
   try {
     const { downloadContentFromMessage } = require('@trashcore/baileys');
+    const { Sticker, StickerTypes } = require('wa-sticker-formatter');
     const fs = require('fs');
-    const path = require('path');
-    const { tmpdir } = require('os');
-    // updated exports from your new exif module
-    const { imageToWebp, videoToWebp, writeExifBuffer, writeExifAuto } = require('./library/exif');
 
     const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const msg =
@@ -6120,39 +6117,37 @@ case 'sticker': {
       return reply(`⚠️ Only works on *image* or *video* messages!`);
     }
 
-    // ⏳ Duration check (if video metadata available)
+    // ⏳ Duration check
     if (msg.videoMessage && msg.videoMessage.seconds > 30) {
       return reply("⚠️ Maximum video duration is 30 seconds!");
     }
 
     reply("🪄 Creating your sticker...");
 
-    // ✅ Download the media into a buffer safely
+    // Download media → Buffer
     const stream = await downloadContentFromMessage(msg, mime.split('/')[0]);
     const chunks = [];
     for await (const chunk of stream) chunks.push(chunk);
     const buffer = Buffer.concat(chunks);
 
-    // Basic integrity check
+    // Validate
     if (!buffer || buffer.length < 5000) {
-      return reply("⚠️ Failed to download media properly (file too small). Try again.");
+      return reply("⚠️ Failed to download media properly. Try again.");
     }
 
-    // Use the new writeExifAuto which returns a Buffer (webp with exif)
-    const stickerBuffer = await writeExifAuto(buffer, mime, {
-      packname: config.PACK_NAME || "Trashcore Stickers",
+    // 🎨 Create sticker using wa-sticker-formatter
+    const sticker = new Sticker(buffer, {
+      pack: config.PACK_NAME || "Trashcore Stickers",
       author: config.AUTHOR || "Trashcore",
+      type: /video/.test(mime) ? StickerTypes.VIDEO : StickerTypes.FULL,
+      quality: 65,   // Heroku safe
     });
 
-    // Final check
-    if (!stickerBuffer || !(stickerBuffer instanceof Buffer) || stickerBuffer.length < 1000) {
-      return reply("⚠️ Failed to create sticker (invalid output).");
-    }
+    const stickerBuffer = await sticker.build();
 
-    // Send sticker (Buffer)
+    // Send sticker
     await trashcore.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m });
 
-    // done
   } catch (err) {
     console.error("❌ sticker error:", err);
     reply(`💥 Failed to create sticker:\n${err.message}`);

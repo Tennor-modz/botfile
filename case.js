@@ -4230,51 +4230,89 @@ case 'web2zip': {
 }
             // ================= PLAY =================
             case 'play': {
-                try {
-                    const tempDir = path.join(__dirname, "temp");
-                    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+  try {
+    const tempDir = path.join(__dirname, "temp");
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-                    if (!args.length) return reply(`🎵 Provide a song name!\nExample: ${command} Not Like Us`);
+    if (!args.length)
+      return reply(`🎵 Provide a song name!\nExample: ${command} Not Like Us`);
 
-                    const query = args.join(" ");
-                    if (query.length > 100) return reply(`📝 Song name too long! Max 100 chars.`);
+    const query = args.join(" ");
+    if (query.length > 100) return reply(`📝 Song name too long! Max 100 chars.`);
 
-                    await reply("🎧 Searching for the track... ⏳");
+    await reply("🎧 Searching for the track... ⏳");
 
-                    const searchResult = await (await yts(`${query} official`)).videos[0];
-                    if (!searchResult) return reply("😕 Couldn't find that song. Try another one!");
+    // Search YouTube
+    const searchResult = (await yts(`${query} official`)).videos[0];
+    if (!searchResult) return reply("😕 Couldn't find that song. Try another one!");
 
-                    const video = searchResult;
-                    const apiUrl = `https://api.privatezia.biz.id/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`;
-                    const response = await axios.get(apiUrl);
-                    const apiData = response.data;
+    const video = searchResult;
+    const apiUrl = `https://api.privatezia.biz.id/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`;
+    const response = await axios.get(apiUrl);
+    const apiData = response.data;
 
-                    if (!apiData.status || !apiData.result || !apiData.result.downloadUrl) throw new Error("API failed to fetch track!");
+    if (!apiData.status || !apiData.result || !apiData.result.downloadUrl)
+      throw new Error("API failed to fetch track!");
 
-                    const timestamp = Date.now();
-                    const fileName = `audio_${timestamp}.mp3`;
-                    const filePath = path.join(tempDir, fileName);
+    const timestamp = Date.now();
+    const fileName = `audio_${timestamp}.mp3`;
+    const filePath = path.join(tempDir, fileName);
 
-                    // Download MP3
-                    const audioResponse = await axios({ method: "get", url: apiData.result.downloadUrl, responseType: "stream", timeout: 600000 });
-                    const writer = fs.createWriteStream(filePath);
-                    audioResponse.data.pipe(writer);
-                    await new Promise((resolve, reject) => { writer.on("finish", resolve); writer.on("error", reject); });
+    // Download MP3
+    const audioResponse = await axios({
+      method: "get",
+      url: apiData.result.downloadUrl,
+      responseType: "stream",
+      timeout: 600000
+    });
+    const writer = fs.createWriteStream(filePath);
+    audioResponse.data.pipe(writer);
+    await new Promise((resolve, reject) => {
+      writer.on("finish", resolve);
+      writer.on("error", reject);
+    });
 
-                    if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) throw new Error("Download failed or empty file!");
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0)
+      throw new Error("Download failed or empty file!");
 
-                    await trashcore.sendMessage(from, { text: stylishReply(`🎶 Playing *${apiData.result.title || video.title}* 🎧`) }, { quoted: m });
-                    await trashcore.sendMessage(from, { audio: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.result.title || video.title).substring(0, 100)}.mp3` }, { quoted: m });
+    // Send thumbnail + title
+    if (video.thumbnail) {
+      await trashcore.sendMessage(
+        from,
+        {
+          image: { url: video.thumbnail },
+          caption: `🎶 Playing *${apiData.result.title || video.title}* 🎧`
+        },
+        { quoted: m }
+      );
+    } else {
+      await trashcore.sendMessage(
+        from,
+        { text: `🎶 Playing *${apiData.result.title || video.title}* 🎧` },
+        { quoted: m }
+      );
+    }
 
-                    // Cleanup
-                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Send audio
+    await trashcore.sendMessage(
+      from,
+      {
+        audio: { url: filePath },
+        mimetype: "audio/mpeg",
+        fileName: `${(apiData.result.title || video.title).substring(0, 100)}.mp3`
+      },
+      { quoted: m }
+    );
 
-                } catch (error) {
-                    console.error("Play command error:", error);
-                    return reply(`💥 Error: ${error.message}`);
-                }
-                break;
-            }
+    // Cleanup
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+  } catch (error) {
+    console.error("Play command error:", error);
+    return reply(`💥 Error: ${error.message}`);
+  }
+  break;
+}
 // ================= EPLFIXTURES =================
 case 'eplfixtures': {
     try {

@@ -76,7 +76,9 @@ module.exports = async function handleCommand(trashcore, m, command,groupAdmins,
     const chatName = chatType === 'Group' ? (groupMeta?.subject || 'Unknown Group') : pushname;
 // Safe owner check
 const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
-const senderJid = m.key.participant || m.key.remoteJid;
+const senderJid = m.key.fromMe
+  ? botNumber
+  : (m.key.participant || m.participant || m.key.remoteJid);
 const isOwner = senderJid === botNumber;
     const reply = (text) => trashcore.sendMessage(from, { text: stylishReply(text) }, { quoted: m });
   const isGroup = from.endsWith('@g.us'); // true if group
@@ -166,11 +168,16 @@ if (isGroup && global.settings?.antilink?.[from]?.enabled) {
 
   if (linkPattern.test(bodyText)) {
     const groupMeta = isGroup ? await trashcore.groupMetadata(from) : null;
-const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
-const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
-    const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
-    const isBotAdmin = groupAdmins.includes(botNumber);
-    const isSenderAdmin = groupAdmins.includes(sender);
+
+const groupAdmins = groupMeta
+  ? groupMeta.participants
+      .filter(p => p.admin === "admin" || p.admin === "superadmin")
+      .map(p => p.id)
+  : [];
+
+const botNumber = trashcore.user.id; // bot full JID
+const isBotAdmin = groupAdmins.includes(botNumber);
+const isSenderAdmin = groupAdmins.includes(sender);
 
     if (!isSenderAdmin && isBotAdmin) {
       try {
@@ -337,63 +344,20 @@ Choose what you'd like to check ⬇️
 }
             // ================= PING =================
             case 'ping': {
-  const axios = require('axios');
   const start = Date.now();
-
-  // Temporary reply
-  const temp = await reply('🏓 Checking connection...');
+  const tempMsg = await trashcore.sendMessage(from, { text: "🏓 Pinging..." });
 
   const latency = Date.now() - start;
 
-  // 🧠 Get random quote
-  let quoteText = "Keep pushing forward.";
-  let quoteAuthor = "Unknown";
-  try {
-    const res = await axios.get('https://zenquotes.io/api/random');
-    if (Array.isArray(res.data) && res.data[0]) {
-      quoteText = res.data[0].q;
-      quoteAuthor = res.data[0].a;
-    }
-  } catch (err) {
-    console.log("⚠️ Quote fetch failed:", err.message);
-  }
-
-  // 🕒 Uptime
-  const uptime = process.uptime();
-  const uptimeString = new Date(uptime * 1000).toISOString().substr(11, 8);
-
-  // 🎨 Random thumbnails
-  const thumbnails = [
-    "https://files.catbox.moe/00vqy4.jpg",
-    "https://files.catbox.moe/9xccze.jpg",
-    "https://files.catbox.moe/gbzodf.jpgg",
-    "https://files.catbox.moe/vclvso.jpg",
-    "https://files.catbox.moe/6dcjfv.jpg",
-    "https://files.catbox.moe/ruq73j.jpg",
-    "https://files.catbox.moe/v46fyx.jpg"
-  ];
-  const thumbnailUrl = thumbnails[Math.floor(Math.random() * thumbnails.length)];
-
-  // 📄 Message body
-  const msg = `
-*🏓 Pong!*
-> *Speed:* ${latency}ms  
-> *Uptime:* ${uptimeString}
-
-🧠 *Quote of the Day:*  
-> “${quoteText}”  
-> — ${quoteAuthor}
-`;
-
-  // 🖼️ Send result
-  await trashcore.sendMessage(
-    m.chat,
-    {
-      image: { url: thumbnailUrl },
-      caption: msg,
-    },
-    { quoted: m }
-  );
+  // Get RAM usage in MB
+  const memoryUsage = process.memoryUsage();
+  const usedMB = (memoryUsage.rss / 1024 / 1024).toFixed(2); // Resident Set Size
+  const heapUsedMB = (memoryUsage.heapUsed / 1024 / 1024).toFixed(2);
+  const heapTotalMB = (memoryUsage.heapTotal / 1024 / 1024).toFixed(2);
+  await trashcore.sendMessage(from, {
+    text: `🏓 Pong!\nLatency: ${latency}ms\nRAM Usage: ${usedMB} MB\nHeap: ${heapUsedMB}/${heapTotalMB} MB`,
+    edit: tempMsg.key // edits the previous message
+  });
 
   break;
 }

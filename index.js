@@ -321,71 +321,109 @@ trashcore.ev.on('group-participants.update', async (update) => {
     const fs = require('fs');
     const path = './library/welcome.json';
     const { id, participants, action } = update;
-
-    const groupMetadata = await trashcore.groupMetadata(id);
-    const groupName = groupMetadata.subject;
-
-    // Load toggle data
     let toggleData = {};
     if (fs.existsSync(path)) toggleData = JSON.parse(fs.readFileSync(path));
-    if (!toggleData[id]) return; // Skip if welcome off
+    if (!toggleData[id]) return;
+    let groupName = id;
+    try {
+      groupName = (await trashcore.groupMetadata(id)).subject;
+    } catch {
+      console.log("⚠️ Using fallback groupName (cached).");
+    }
 
     for (const user of participants) {
       if (action === 'add') {
+
+        // Profile picture (safe if 1 call per user)
         const ppUrl = await trashcore
           .profilePictureUrl(user, 'image')
-          .catch(() => 'https://files.catbox.moe/xr70w7.jpg'); // default image
+          .catch(() => 'https://files.catbox.moe/xr70w7.jpg');
 
-        const name =
-          (await trashcore.onWhatsApp(user))[0]?.notify ||
-          user.split('@')[0];
+        // SAFE username fallback (avoid onWhatsApp())
+        const username = user.split("@")[0];
 
         await trashcore.sendMessage(id, {
           image: { url: ppUrl },
-          caption: `👋 *Welcome @${user.split('@')[0]}!*\n🎉 Glad to have you in *${groupName}*!`,
+          caption: `👋 *Welcome @${username}!*\n🎉 Glad to have you in *${groupName}*!`,
           contextInfo: { mentionedJid: [user] }
         });
       }
     }
+
   } catch (err) {
     console.error('💥 Welcome Error:', err);
   }
 });
 
+// Prevent duplicate listeners
+trashcore.ev.removeAllListeners('group-participants.update');
+let joinLeaveBlock = new Set();
+
 trashcore.ev.on('group-participants.update', async (update) => {
   try {
     const fs = require('fs');
-    const path = './library/goodbye.json';
-    const { id, participants, action } = update;
 
-    const groupMetadata = await trashcore.groupMetadata(id);
-    const groupName = groupMetadata.subject;
-    let toggleData = {};
-    if (fs.existsSync(path)) toggleData = JSON.parse(fs.readFileSync(path));
-    if (!toggleData[id]) return;
+    const welcomePath = './library/welcome.json';
+    const goodbyePath = './library/goodbye.json';
+
+    const { id, participants, action } = update;
+    const key = `${id}-${action}-${participants.join(',')}`;
+    if (joinLeaveBlock.has(key)) return;
+    joinLeaveBlock.add(key);
+    setTimeout(() => joinLeaveBlock.delete(key), 1500);
+
+    // Load settings
+    let welcomeData = fs.existsSync(welcomePath)
+      ? JSON.parse(fs.readFileSync(welcomePath))
+      : {};
+
+    let goodbyeData = fs.existsSync(goodbyePath)
+      ? JSON.parse(fs.readFileSync(goodbyePath))
+      : {};
+
+    const welcomeOn = welcomeData[id];
+    const goodbyeOn = goodbyeData[id];
+    if (!welcomeOn && !goodbyeOn) return;
+
+    // Safe group name
+    let groupName = id;
+    try {
+      const meta = await trashcore.groupMetadata(id);
+      groupName = meta.subject;
+    } catch {
+      console.log("⚠️ Using fallback groupName (rate-limit).");
+    }
 
     for (const user of participants) {
-      if (action === 'remove') {
-        const ppUrl = await trashcore
-          .profilePictureUrl(user, 'image')
-          .catch(() => 'https://files.catbox.moe/xr70w7.jpg'); // default image
+      const username = user.split("@")[0];
 
-        const name =
-          (await trashcore.onWhatsApp(user))[0]?.notify ||
-          user.split('@')[0];
+      // Safe profile picture
+      const ppUrl = await trashcore.profilePictureUrl(user, 'image')
+        .catch(() => 'https://files.catbox.moe/xr70w7.jpg');
 
+      // 🟢 WELCOME
+      if (action === 'add' && welcomeOn) {
         await trashcore.sendMessage(id, {
           image: { url: ppUrl },
-          caption: `😔 *${name}* (@${user.split('@')[0]}) has left *${groupName}*.\n💐 We’ll miss you!`,
+          caption: `👋 *Welcome @${username}!*\n🎉 Glad to have you in *${groupName}*!`,
+          contextInfo: { mentionedJid: [user] }
+        });
+      }
+
+      // 🔴 GOODBYE
+      if (action === 'remove' && goodbyeOn) {
+        await trashcore.sendMessage(id, {
+          image: { url: ppUrl },
+          caption: `😔 *@${username}* has left *${groupName}*.\n💐 We’ll miss you!`,
           contextInfo: { mentionedJid: [user] }
         });
       }
     }
+
   } catch (err) {
-    console.error('💥 Goodbye Error:', err);
+    console.error("💥 Participants Handler Error:", err);
   }
 });
-
 trashcore.ev.on('group-participants.update', async (update) => {
   try {
     const { id, participants, action } = update;
@@ -447,32 +485,30 @@ let prefixSettings = fs.existsSync(prefixSettingsPath)
   ? JSON.parse(fs.readFileSync(prefixSettingsPath, 'utf8'))
   : { prefix: '.', defaultPrefix: '.' };
 
-let prefix = prefixSettings.prefix || ''; // fallback to '' if no prefix
+let prefix = prefixSettings.prefix || '.';
 
 const from = m.key.remoteJid;
 const sender = m.key.participant || from;
 const isGroup = from.endsWith('@g.us');
 const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
 
-// Extract message body
+// Extract body (incoming text)
 let body =
-  m.message.conversation ||
-  m.message.extendedTextMessage?.text ||
-  m.message.imageMessage?.caption ||
-  m.message.videoMessage?.caption ||
-  m.message.documentMessage?.caption || '';
+  m.message?.conversation ||
+  m.message?.extendedTextMessage?.text ||
+  m.message?.imageMessage?.caption ||
+  m.message?.videoMessage?.caption ||
+  m.message?.documentMessage?.caption ||
+  "";
 body = body.trim();
-if (!body) return;
 
-// Skip if prefix is required and message doesn't start with it
-if (prefix !== '' && !body.startsWith(prefix)) return;
+// Always let the bot read messages (non-commands included)
+if (!body) body = "";  // remove return
 
-// Remove prefix if present
-const bodyWithoutPrefix = prefix === '' ? body : body.slice(prefix.length);
-
-// Split command and arguments
-const args = bodyWithoutPrefix.trim().split(/ +/);
-const command = args.shift().toLowerCase();
+// Now detect command properly
+const isCmd = body.startsWith(prefix);
+const command = isCmd ? body.slice(prefix.length).split(" ")[0].toLowerCase() : "";
+const args = isCmd ? body.trim().split(/ +/).slice(1) : [];
     const groupMeta = isGroup ? await trashcore.groupMetadata(from).catch(() => null) : null;
     const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
     const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
@@ -495,7 +531,7 @@ const command = args.shift().toLowerCase();
 }
 
 // ================== Startup orchestration ==================
-async function tylor() {
+async function sessionID() {
   try {
     await fs.promises.mkdir(sessionDir, { recursive: true });
 
@@ -524,4 +560,4 @@ async function tylor() {
   }
 }
 
-tylor();
+sessionID();

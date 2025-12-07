@@ -94,72 +94,17 @@ const isOwner = senderJid === botNumber;
 
     const time = new Date().toLocaleTimeString();
    
-if (m.message) {
-  const isGroupMsg = m.isGroup;
-  const body = m.body || m.messageStubType || "—";
-  const pushnameDisplay = m.pushName || "Unknown";
-  const command = body.startsWith(prefix) ? body.split(' ')[0] : null;
+let groupName = m.isGroup && trashcore.groupMetadata 
+  ? (await trashcore.groupMetadata(m.chat)).subject 
+  : null;
 
-  // 🕒 Time in EAT
-  const date = new Date().toLocaleString("en-KE", {
-    timeZone: "Africa/Nairobi",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  const hour = new Date().toLocaleString("en-KE", {
-    timeZone: "Africa/Nairobi",
-    hour: "2-digit",
-    hour12: false,
-  });
-  const hourInt = parseInt(hour, 10);
-  const ucapanWaktu =
-    hourInt < 12
-      ? "Good Morning ☀️"
-      : hourInt < 18
-      ? "Good Afternoon 🌤️"
-      : "Good Evening 🌙";
-
-  // 🎨 Colors
-  const headerColor = chalk.black.bold.bgHex("#ff5e78");  // Pink header
-  const subHeaderColor = chalk.white.bold.bgHex("#4a69bd"); // Blue header
-  const bodyColor = chalk.black.bgHex("#fdcb6e"); // Yellow box
-
-  // 🏠 Fetch group metadata if group message safely
-  let groupName = "";
-  if (isGroupMsg) {
-    try {
-      const groupMetadata = await trashcore.groupMetadata(m.chat).catch(() => null);
-      groupName = groupMetadata?.subject || "Unknown Group";
-    } catch {
-      groupName = "Unknown Group";
-    }
-  }
-
-  // 🧾 Log output
-  console.log(headerColor(`\n🌟 ${ucapanWaktu} 🌟`));
-  console.log(
-    subHeaderColor(
-      `🚀 ${isGroupMsg ? "GROUP MESSAGE RECEIVED" : "PRIVATE MESSAGE RECEIVED"} 🚀`
-    )
-  );
-
-  const info = `
-📅 DATE (EAT): ${date}
-💬 MESSAGE: ${body}
-🗣️ SENDERNAME: ${pushnameDisplay}
-👤 JID: ${m.sender}
-${isGroupMsg ? `🏠 GROUP: ${groupName}` : ""}
-`;
-
-  console.log(bodyColor(info));
-}
+console.log(
+  chalk.black(chalk.bgWhite(!command ? '[ MESSAGE ]' : '[ COMMAND ]')),
+  chalk.black(chalk.bgGreen(new Date)),
+  chalk.black(chalk.bgBlue(body || m.mtype)) + '\n' +
+  chalk.magenta('=> From'), chalk.green(pushname), chalk.yellow(m.sender) + '\n' +
+  chalk.blueBright('=> In'), chalk.green(m.isGroup ? groupName : 'Private Chat', m.chat)
+);
 // --- 🚨 ANTILINK 2.0 AUTO CHECK ---
 if (isGroup && global.settings?.antilink?.[from]?.enabled) {
   const settings = global.settings.antilink[from];

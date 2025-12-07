@@ -73,6 +73,7 @@ module.exports = async function handleCommand(trashcore, m, command,groupAdmins,
     const participant = trashcore.decodeJid(m.key.participant || from);
     const pushname = m.pushName || "Unknown User";
     const chatType = from.endsWith('@g.us') ? 'Group' : 'Private';
+    const budy = (typeof m.text === 'string') ? m.text : '';
     const chatName = chatType === 'Group' ? (groupMeta?.subject || 'Unknown Group') : pushname;
 // Safe owner check
 const botNumber = trashcore.user.id.split(":")[0] + "@s.whatsapp.net";
@@ -94,6 +95,14 @@ const isOwner = senderJid === botNumber;
 
     const time = new Date().toLocaleTimeString();
    
+let safeBody =
+  body ||
+  m.message?.reactionMessage?.text ||
+  m.message?.stickerMessage && "[STICKER]" ||
+  m.message?.imageMessage && "[IMAGE]" ||
+  m.message?.videoMessage && "[VIDEO]" ||
+  m.mtype ||
+  "[UNKNOWN]";
 let groupName = m.isGroup && trashcore.groupMetadata 
   ? (await trashcore.groupMetadata(m.chat)).subject 
   : null;
@@ -101,7 +110,7 @@ let groupName = m.isGroup && trashcore.groupMetadata
 console.log(
   chalk.black(chalk.bgWhite(!command ? '[ MESSAGE ]' : '[ COMMAND ]')),
   chalk.black(chalk.bgGreen(new Date)),
-  chalk.black(chalk.bgBlue(body || m.mtype)) + '\n' +
+  chalk.black(chalk.bgBlue(safeBody)) + '\n' +
   chalk.magenta('=> From'), chalk.green(pushname), chalk.yellow(m.sender) + '\n' +
   chalk.blueBright('=> In'), chalk.green(m.isGroup ? groupName : 'Private Chat', m.chat)
 );

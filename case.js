@@ -96,23 +96,37 @@ const isOwner = senderJid === botNumber;
     const time = new Date().toLocaleTimeString();
    
 let safeBody =
-  body ||
-  m.message?.reactionMessage?.text ||
-  m.message?.stickerMessage && "[STICKER]" ||
-  m.message?.imageMessage && "[IMAGE]" ||
-  m.message?.videoMessage && "[VIDEO]" ||
-  m.mtype ||
-  "[UNKNOWN]";
-let groupName = m.isGroup && trashcore.groupMetadata 
-  ? (await trashcore.groupMetadata(m.chat)).subject 
-  : null;
+    body ||
+    m.message?.reactionMessage?.text ||
+
+    // Media types
+    (m.message?.audioMessage     && "[AUDIO]") ||
+    (m.message?.imageMessage     && "[IMAGE]") ||
+    (m.message?.videoMessage     && "[VIDEO]") ||
+    (m.message?.stickerMessage   && "[STICKER]") ||
+    (m.message?.documentMessage  && "[DOCUMENT]") ||
+
+    // View Once Messages (Image or Video)
+    (m.message?.viewOnceMessageV2?.message?.imageMessage && "[VIEW-ONCE IMAGE]") ||
+    (m.message?.viewOnceMessageV2?.message?.videoMessage && "[VIEW-ONCE VIDEO]") ||
+
+    // Other types
+    (m.message?.contactMessage   && "[CONTACT]") ||
+    (m.message?.locationMessage  && "[LOCATION]") ||
+    (m.message?.liveLocationMessage && "[LIVE LOCATION]") ||
+    (m.message?.pollCreationMessage && "[POLL]") ||
+    (m.message?.documentWithCaptionMessage && "[DOCUMENT + CAPTION]") ||
+
+    // Fallback: message type or unknown
+    m.mtype ||
+    "[UNKNOWN]";
 
 console.log(
   chalk.black(chalk.bgWhite(!command ? '[ MESSAGE ]' : '[ COMMAND ]')),
   chalk.black(chalk.bgGreen(new Date)),
   chalk.black(chalk.bgBlue(safeBody)) + '\n' +
   chalk.magenta('=> From'), chalk.green(pushname), chalk.yellow(m.sender) + '\n' +
-  chalk.blueBright('=> In'), chalk.green(m.isGroup ? groupName : 'Private Chat', m.chat)
+  chalk.blueBright('=> In'), chalk.green(m.isGroup ? 'Group Chat' : 'Private Chat', m.chat)
 );
 // --- 🚨 ANTILINK 2.0 AUTO CHECK ---
 if (isGroup && global.settings?.antilink?.[from]?.enabled) {

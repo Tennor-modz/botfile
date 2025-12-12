@@ -128,6 +128,8 @@ console.log(
   chalk.magenta('=> From'), chalk.green(pushname), chalk.yellow(m.sender) + '\n' +
   chalk.blueBright('=> In'), chalk.green(m.isGroup ? 'Group Chat' : 'Private Chat', m.chat)
 );
+
+const {runtime} = require('./library/myfunc')
 // --- 🚨 ANTILINK 2.0 AUTO CHECK ---
 if (isGroup && global.settings?.antilink?.[from]?.enabled) {
   const settings = global.settings.antilink[from];
@@ -329,6 +331,15 @@ Choose what you'd like to check ⬇️
 
   break;
 }
+
+  // ================= RUNTIME =================
+case 'runtime': {
+const host = detectPlatform(); 
+  await trashcore.sendMessage(m.chat, {
+    text: `*Trashcore Ultra* is running on *${host}* for _${runtime(process.uptime())}_.`
+  });
+}
+break;
             // ================= ALIVE =================
 case 'alive': {
   const axios = require('axios');
@@ -489,6 +500,7 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ┃⭔ whois
 ┃⭔ scan
 ┃⭔ speed
+┃⭔ runtime 
 ┃⭔ catphotos
 
 🛟 MEDIA

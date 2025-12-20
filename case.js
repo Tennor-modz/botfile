@@ -22,6 +22,8 @@ const chalk = require('chalk');
 const os = require('os');
 const { writeFile } = require('./library/utils');
 const { saveSettings,loadSettings } = require('./settingsManager');
+
+const { prepareWAMessageMedia, proto,downloadContentFromMessage, generateWAMessageFromContent } = require("@trashcore/baileys");
 // =============== COLORS ===============
 const colors = {
     reset: "\x1b[0m",
@@ -95,36 +97,55 @@ const isOwner = senderJid === botNumber;
 
     const time = new Date().toLocaleTimeString();
    
-let safeBody =
-    body ||
-    m.message?.reactionMessage?.text ||
+function extractText(m) {
+  if (!m || !m.message) return null;
 
-    // Media types
-    (m.message?.audioMessage     && "[AUDIO]") ||
-    (m.message?.imageMessage     && "[IMAGE]") ||
-    (m.message?.videoMessage     && "[VIDEO]") ||
-    (m.message?.stickerMessage   && "[STICKER]") ||
-    (m.message?.documentMessage  && "[DOCUMENT]") ||
+  let msg = m.message;
+  if (msg.ephemeralMessage?.message)
+    msg = msg.ephemeralMessage.message;
 
-    // View Once Messages (Image or Video)
-    (m.message?.viewOnceMessageV2?.message?.imageMessage && "[VIEW-ONCE IMAGE]") ||
-    (m.message?.viewOnceMessageV2?.message?.videoMessage && "[VIEW-ONCE VIDEO]") ||
+  if (msg.viewOnceMessage?.message)
+    msg = msg.viewOnceMessage.message;
 
-    // Other types
-    (m.message?.contactMessage   && "[CONTACT]") ||
-    (m.message?.locationMessage  && "[LOCATION]") ||
-    (m.message?.liveLocationMessage && "[LIVE LOCATION]") ||
-    (m.message?.pollCreationMessage && "[POLL]") ||
-    (m.message?.documentWithCaptionMessage && "[DOCUMENT + CAPTION]") ||
+  if (msg.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson) {
+    try {
+      const parsed = JSON.parse(
+        msg.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson
+      );
+      if (parsed?.id) return parsed.id;
+    } catch (e) {
+      return null;
+    }
+  }
 
-    // Fallback: message type or unknown
-    m.mtype ||
-    "[UNKNOWN]";
+  if (msg.buttonsResponseMessage?.selectedButtonId)
+    return msg.buttonsResponseMessage.selectedButtonId;
+  if (msg.listResponseMessage?.singleSelectReply?.selectedRowId)
+    return msg.listResponseMessage.singleSelectReply.selectedRowId;
+  if (msg.templateButtonReplyMessage?.selectedId)
+    return msg.templateButtonReplyMessage.selectedId;
+
+  if (msg.imageMessage?.caption)
+    return msg.imageMessage.caption;
+  if (msg.videoMessage?.caption)
+    return msg.videoMessage.caption;
+  if (msg.documentMessage?.caption)
+    return msg.documentMessage.caption;
+
+  if (msg.extendedTextMessage?.text)
+    return msg.extendedTextMessage.text;
+  if (msg.conversation)
+    return msg.conversation;
+
+  return null;
+}
+
+let safeBody = body || extractText(m);
 
 console.log(
   chalk.black(chalk.bgWhite(!command ? '[ MESSAGE ]' : '[ COMMAND ]')),
-  chalk.black(chalk.bgGreen(new Date)),
-  chalk.black(chalk.bgBlue(safeBody)) + '\n' +
+  chalk.black(chalk.bgGreen(new Date())),
+  chalk.black(chalk.bgBlue(safeBody || '[NO TEXT]')) + '\n' +
   chalk.magenta('=> From'), chalk.green(pushname), chalk.yellow(m.sender) + '\n' +
   chalk.blueBright('=> In'), chalk.green(m.isGroup ? 'Group Chat' : 'Private Chat', m.chat)
 );
@@ -502,6 +523,7 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 ┃⭔ speed
 ┃⭔ runtime 
 ┃⭔ catphotos
+┃⭔ npm
 
 🛟 MEDIA
 ┃⭔ tiktok
@@ -942,6 +964,7 @@ case 'update-termux': {
   }
 }
 break;
+
 // ================= PINTEREST =================
 case 'scan': {
   try {
@@ -1029,6 +1052,45 @@ case 'gpt': {
     }
     break;
 }
+// ================= NPM SEARCH =================
+case 'npm': {
+    if (!text) {
+        return reply('Example usage: npm chalk');
+    }
+
+    const query = encodeURIComponent(text);
+    const url = `https://api.fvckers.my.id/api/search/npm?q=${query}`;
+
+    try {
+        const res = await axios.get(url);
+        const items = res.data?.data?.items;
+
+        if (!items || items.length === 0) {
+            return reply('No npm packages found.');
+        }
+
+        let msg = `📦 *NPM Search Results for:* ${text}\n`;
+        msg += `🔎 Total found: ${res.data.data.total}\n\n`;
+
+        items.slice(0, 5).forEach((pkg, i) => {
+            msg += `*${i + 1}. ${pkg.name}*\n`;
+            msg += `🆕 Version: ${pkg.version}\n`;
+            msg += `📝 ${pkg.description || 'No description'}\n`;
+            msg += `🔗 ${pkg.links?.npm || '-'}\n\n`;
+        });
+
+        await trashcore.sendMessage(
+            m.chat,
+            { text: msg },
+            { quoted: m }
+        );
+
+    } catch (err) {
+        console.error(err);
+        reply('❌ Failed to fetch npm data.');
+    }
+}
+break;
 // ================= LLAMA =================
 case 'llama': {
     if (!args[0]) {

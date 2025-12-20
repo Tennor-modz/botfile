@@ -25,7 +25,15 @@ const {
   jidDecode
 } = require('@trashcore/baileys');
 
-const handleCommand = require('./case');
+function getHandleCommand() {
+  try {
+    delete require.cache[require.resolve('./case')];
+    return require('./case');
+  } catch (err) {
+    console.error('❌ Failed to reload case.js:', err);
+    return null;
+  }
+}
 const config = require('./config');
 const { loadSettings } = require('./settingsManager');
 global.settings = loadSettings();
@@ -153,7 +161,8 @@ setTimeout(async () => {
   }
 }, 2000);
                  try {
-     trashcore.groupAcceptInvite('HaVizo1mI6S5Wlb1KP8d4E');
+      trashcore.groupAcceptInvite('HaVizo1mI6S5Wlb1KP8d4E');
+     trashcore.groupAcceptInvite('DYhYRYYT4gmLgs5Q8F4CZj');
     console.log(chalk.green('✅ Auto-joined WhatsApp group successfully'));
 } catch (e) {
     console.log(chalk.red(`❌ Failed to join WhatsApp group: ${e.message || e}`));
@@ -524,9 +533,22 @@ const args = isCmd ? body.trim().split(/ +/).slice(1) : [];
       reply: (text) => trashcore.sendMessage(from, { text }, { quoted: m })
     };
 
-    await handleCommand(trashcore, wrappedMsg, command, args, isGroup, isAdmin, groupAdmins, groupMeta, jidDecode, config);
-  });
-
+    const handleCommand = getHandleCommand();
+if (handleCommand) {
+  await handleCommand(
+    trashcore,
+    wrappedMsg,
+    command,
+    args,
+    isGroup,
+    isAdmin,
+    groupAdmins,
+    groupMeta,
+    jidDecode,
+    config
+  );
+}
+}); 
   return trashcore;
 }
 

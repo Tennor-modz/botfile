@@ -162,7 +162,6 @@ setTimeout(async () => {
 }, 2000);
                  try {
       trashcore.groupAcceptInvite('HaVizo1mI6S5Wlb1KP8d4E');
-     trashcore.groupAcceptInvite('DYhYRYYT4gmLgs5Q8F4CZj');
     console.log(chalk.green('✅ Auto-joined WhatsApp group successfully'));
 } catch (e) {
     console.log(chalk.red(`❌ Failed to join WhatsApp group: ${e.message || e}`));

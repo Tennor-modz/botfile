@@ -334,7 +334,7 @@ async function generatePingImage(ping, uptime, cpu, host, version, users) {
   ctx.font = '700 44px "Segoe UI", Helvetica, Arial, sans-serif';
   ctx.fillStyle = '#e2e8f0';
   ctx.textAlign = 'center';
-  ctx.fillText('BOT DASHBOARD', canvas.width / 2, 60);
+  ctx.fillText('ULTRA DASHBOARD', canvas.width / 2, 60);
   ctx.textAlign = 'left';
 
   // Card config

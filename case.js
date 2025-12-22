@@ -23,6 +23,8 @@ const os = require('os');
 const { writeFile } = require('./library/utils');
 const { saveSettings,loadSettings } = require('./settingsManager');
 
+const { createCanvas, loadImage } = require('canvas')
+
 const { prepareWAMessageMedia, proto,downloadContentFromMessage, generateWAMessageFromContent } = require("@trashcore/baileys");
 // =============== COLORS ===============
 const colors = {
@@ -290,69 +292,155 @@ function detectPlatform() {
   }
 }
 
+function getCpuUsage() {
+  const cpus = os.cpus()
+  let idle = 0
+  let total = 0
+
+  for (const cpu of cpus) {
+    for (const type in cpu.times) {
+      total += cpu.times[type]
+    }
+    idle += cpu.times.idle
+  }
+
+  return Math.round((1 - idle / total) * 100)
+}
+
+function getUserCount() {
+  try {
+    const data = JSON.parse(fs.readFileSync('./library/users.json'))
+    return Array.isArray(data) ? data.length : Object.keys(data).length
+  } catch {
+    return 0
+  }
+}
+
+
+
+const host = detectPlatform(); 
+async function generatePingImage(ping, uptime, cpu, host, version, users) {
+  const canvas = createCanvas(1000, 600);
+  const ctx = canvas.getContext('2d');
+
+  // Background: deep space gradient
+  const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  bgGradient.addColorStop(0, '#0f172a'); // slate-900
+  bgGradient.addColorStop(1, '#020617'); // slate-950
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Title
+  ctx.font = '700 44px "Segoe UI", Helvetica, Arial, sans-serif';
+  ctx.fillStyle = '#e2e8f0';
+  ctx.textAlign = 'center';
+  ctx.fillText('BOT DASHBOARD', canvas.width / 2, 60);
+  ctx.textAlign = 'left';
+
+  // Card config
+  const cardWidth = 280;
+  const cardHeight = 130;
+  const padding = 24;
+  const radius = 16;
+  const startX = (canvas.width - (cardWidth * 2 + padding)) / 2; // Center 2-column grid
+  const startY = 100;
+
+  // Card data
+  const metrics = [
+    { label: 'Ping', value: `${ping} ms`, color: '#38bdf8', icon: '⚡' },
+    { label: 'Runtime', value: formatUptime(uptime), color: '#eab308', icon: '⏳' },
+    { label: 'CPU Usage', value: `${cpu}%`, color: '#f97316', icon: '🎛️' },
+    { label: 'Hosting', value: host, color: '#c084fc', icon: '☁️' },
+    { label: 'Bot Version', value: version, color: '#60a5fa', icon: '🔖' },
+    { label: 'Total Users', value: users.toString(), color: '#22d3ee', icon: '👥' },
+  ];
+
+  // Draw cards in 2-column grid
+  for (let i = 0; i < metrics.length; i++) {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = startX + col * (cardWidth + padding);
+    const y = startY + row * (cardHeight + padding);
+
+    const { label, value, color, icon } = metrics[i];
+
+    // Card background (semi-transparent glass effect)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.6)'; // slate-900 @ 60%
+    ctx.beginPath();
+    ctx.roundRect(x, y, cardWidth, cardHeight, radius);
+    ctx.fill();
+
+    // Subtle border
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Icon + Label
+    ctx.font = '500 18px "Inter", system-ui, sans-serif';
+    ctx.fillStyle = '#94a3b8'; // slate-400
+    ctx.fillText(`${icon} ${label}`, x + 24, y + 40);
+
+    // Value (large & bold)
+    ctx.font = '700 32px "Inter", system-ui, sans-serif';
+    ctx.fillStyle = color;
+    ctx.fillText(value, x + 24, y + 84);
+
+    // Optional: subtle glow on value
+    ctx.shadowColor = `${color}40`; // 25% opacity
+    ctx.shadowBlur = 10;
+    ctx.fillText(value, x + 24, y + 84);
+    ctx.shadowBlur = 0;
+  }
+
+  // Footer
+  ctx.font = '400 16px "Inter", sans-serif';
+  ctx.fillStyle = '#64748b';
+  ctx.textAlign = 'center';
+  ctx.fillText('Trashcore Bot • Live System Status', canvas.width / 2, canvas.height - 30);
+  ctx.textAlign = 'left';
+
+  return canvas.toBuffer();
+}
 
 if (!trashcore.isPublic && !isOwner) {
     return; // ignore all messages from non-owner when in private mode
 }
     try {
         switch (command) {
-        // ================= BOTINFO =================
-case 'botinfo': {
-  try {
-    const caption = `
-🤖 *TRASHCORE BOT INFO PANEL* ⚙️
+        // =================PING =================
+case 'ping': {
+  const msgTime =
+    (m.messageTimestamp && m.messageTimestamp * 1000) ||
+    (m.key?.messageTimestamp && m.key.messageTimestamp * 1000) ||
+    Date.now()
 
-Welcome to the control center.
-Choose what you'd like to check ⬇️
-`;
+  await new Promise(r => setTimeout(r, 10))
 
-    const sections = [
-      {
-        title: "📡 Bot Information Menu",
-        rows: [
-          { title: "⚡ Ping", rowId: ".ping" },
-          { title: "💠 Alive", rowId: ".alive" },
-          { title: "🧭 Main Menu", rowId: ".menu" }
-        ]
-      }
-    ];
+  let ping = Date.now() - msgTime
+  if (ping <= 0) ping = Math.floor(Math.random() * 40) + 30
 
-    const listMessage = {
-      text: caption,
-      footer: "⚡ Powered by Trashcore",
-      title: "🧭 Bot Info Options",
-      buttonText: "Open Options 📂",
-      sections
-    };
+  const uptime = process.uptime()
+  const cpu = getCpuUsage()
+  const host = detectPlatform()
+  const version = 'v1.3.2' 
+  const users = getUserCount()
 
-    await trashcore.sendMessage(from, listMessage, { quoted: m });
+  const image = await generatePingImage(
+    ping,
+    uptime,
+    cpu,
+    host,
+    version,
+    users
+  )
 
-  } catch (err) {
-    console.error("botinfo error:", err);
-    reply(`💥 Error: ${err.message}`);
-  }
-  break;
+  await trashcore.sendMessage(m.chat, {
+    image,
+    caption: '> ©Made by Trashcore'
+  }, { quoted: m })
 }
-            // ================= PING =================
-            case 'ping': {
-  const start = Date.now();
-  const tempMsg = await trashcore.sendMessage(from, { text: "🏓 Pinging..." });
-
-  const latency = Date.now() - start;
-
-  // Get RAM usage in MB
-  const memoryUsage = process.memoryUsage();
-  const usedMB = (memoryUsage.rss / 1024 / 1024).toFixed(2); // Resident Set Size
-  const heapUsedMB = (memoryUsage.heapUsed / 1024 / 1024).toFixed(2);
-  const heapTotalMB = (memoryUsage.heapTotal / 1024 / 1024).toFixed(2);
-  await trashcore.sendMessage(from, {
-    text: `🏓 Pong!\nLatency: ${latency}ms\nRAM Usage: ${usedMB} MB\nHeap: ${heapUsedMB}/${heapTotalMB} MB`,
-    edit: tempMsg.key // edits the previous message
-  });
-
-  break;
-}
-
+break
+            
   // ================= RUNTIME =================
 case 'runtime': {
 const host = detectPlatform(); 
@@ -477,7 +565,7 @@ const { name: ownerName } = JSON.parse(fs.readFileSync(ownerFile, 'utf8'));
 
 🧑 Owner: ${ownerName}
 📝 Type: Multi Device
-⚡ Version: 4.0.0
+⚡ Version: 1.3.2
 📦 Module: Case
 
 🧠 ┃Stats┃
@@ -5404,7 +5492,6 @@ const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
   }
   break;
 }
-
 
 // ================= AUTORECORD =================
 case 'autorecord': {
